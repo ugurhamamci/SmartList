@@ -87,7 +87,11 @@ class DashboardView extends StatelessWidget {
 
     return CustomScrollView(
       slivers: [
-        _DashboardAppBar(userAvatar: userAvatar, onSearchTap: onSearchTap, onProfileTap: onProfileTap),
+        _DashboardAppBar(
+          userAvatar: userAvatar,
+          onSearchTap: onSearchTap,
+          onProfileTap: onProfileTap,
+        ),
         SliverPadding(
           padding: EdgeInsets.symmetric(horizontal: spacing.containerMargin),
           sliver: SliverList(

@@ -76,9 +76,7 @@ class QuickActionTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: background,
           borderRadius: BorderRadius.circular(spacing.radiusCard),
-          border: isFilled
-              ? null
-              : Border.all(color: scheme.outlineVariant),
+          border: isFilled ? null : Border.all(color: scheme.outlineVariant),
           boxShadow: isFilled ? null : DesignTokens.cardShadow,
         ),
         child: Padding(
