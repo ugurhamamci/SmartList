@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    Tasarim onizlemesi. Firebase'e dokunmaz, --dart-define gerektirmez.
+    Android Studio / IntelliJ bu dosyayi otomatik okur ve calistirma
+    listesinde "SmartList Onizleme" olarak gosterir.
+  -->
+  <configuration
+      default="false"
+      name="SmartList Onizleme"
+      type="FlutterRunConfigurationType"
+      factoryName="Flutter">
+    <option name="filePath" value="$PROJECT_DIR$/lib/main_preview.dart" />
+    <method v="2" />
+  </configuration>
+</component>
