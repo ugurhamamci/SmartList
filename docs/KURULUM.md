@@ -16,6 +16,7 @@ Studio ve Flutter indirmesi.
 5. [Kod editörü](#5-kod-editörü)
 6. [Projeyi indirme](#6-projeyi-indirme)
 7. [Projeyi hazırlama](#7-projeyi-hazırlama)
+   · **[7.5 Telefonda hemen görmek (Firebase gerekmez)](#75-telefonda-hemen-görmek-firebase-gerekmez)**
 8. [Firebase projesi oluşturma](#8-firebase-projesi-oluşturma)
 9. [Firebase değerlerini tanımlama](#9-firebase-değerlerini-tanımlama)
 10. [Uygulamayı çalıştırma](#10-uygulamayı-çalıştırma)
@@ -263,6 +264,71 @@ flutter test     ->  All tests passed!   (25 test)
 > ama paket sürümleri makinenize göre çözüldüğü için yeniden üretmek en
 > güvenlisi. Model dosyalarını her değiştirdiğinizde bu komutu tekrar
 > çalıştırmalısınız.
+
+---
+
+## 7.5 Telefonda hemen görmek (Firebase gerekmez)
+
+Firebase projesi kurmadan, arayüzü telefonunda çalıştırabilirsin. Ayrı bir giriş
+noktası var: `lib/main_preview.dart`. Firebase'e hiç dokunmaz, veriyi bellekte
+tutar, tüm ekranlar ve etkileşimler çalışır.
+
+### Telefonu bağla
+
+1. Telefonda **Ayarlar → Telefon hakkında → Yapı numarası**'na 7 kez dokun →
+   Geliştirici seçenekleri açılır.
+2. **Ayarlar → Geliştirici seçenekleri → USB ile hata ayıklama**'yı aç.
+3. USB kablosuyla bağla. Telefonda çıkan **"USB hata ayıklamaya izin ver?"**
+   uyarısını onayla.
+
+Kontrol:
+
+```powershell
+flutter devices
+```
+
+Telefonun listede görünmeli. Görünmüyorsa: kabloyu değiştir (bazı kablolar
+yalnızca şarj eder), USB modunu **Dosya aktarımı (MTP)** yap, `adb kill-server`
+sonra tekrar dene.
+
+### Çalıştır
+
+```powershell
+.\scripts\run_preview.ps1
+```
+
+İlk Android derlemesi Gradle bağımlılıklarını indirdiği için **10 dakikayı
+aşabilir**. Sonraki çalıştırmalar saniyeler sürer.
+
+Kurulabilir dosya üretmek istersen:
+
+```powershell
+.\scripts\run_preview.ps1 -Build apk
+# çıktı: build\app\outputs\flutter-apk\app-release.apk
+```
+
+Bu APK'yı telefona kopyalayıp kurabilirsin — kablo bağlı olmasa da çalışır.
+
+> ⚠️ **Düz `flutter run` çalıştırmayın.** O `main.dart`'ı kullanır ve Firebase
+> değerlerini ister; hangi `--dart-define`'ın eksik olduğunu söyleyen bir hata
+> ekranı görürsünüz. Bu bir hata değil, kasıtlı davranış. Gerçek uygulamayı
+> çalıştırmak için önce 8. ve 9. bölümleri tamamlayın, sonra `run_dev.ps1`
+> kullanın.
+
+### Önizlemede ne çalışıyor
+
+| İşlem | Sonuç |
+|---|---|
+| Açılış | Logo animasyonu, ardından ana ekran |
+| Liste kartına dokun | Liste detayı açılır |
+| Checkbox | Tik yaylanarak gelir, ürün Tamamlananlar'a geçer |
+| Sağa kaydır | Ürün tamamlanır |
+| Sola kaydır | Ürün silinir |
+| FAB (+) | Ürün ekleme sayfası; eklenen ürün listenin başına gelir |
+| Alt sekmeler | Lists, Activity, Shared, Profile |
+
+Servisi henüz bağlanmamış butonlar (barkod, sesle ekleme, arama) sessiz kalmaz,
+"yakında" bildirimi gösterir.
 
 ---
 

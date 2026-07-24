@@ -133,7 +133,8 @@ söyleyen bir ekranla** açılışta durur — sessiz çalışma zamanı hatası
 | Komut | Ne yapar |
 |---|---|
 | `.\scripts\setup.ps1` | Paketler + kod üretimi + analiz + test |
-| `.\scripts\run_dev.ps1` | Uygulamayı çalıştırır |
+| `.\scripts\run_preview.ps1` | **Arayüzü Firebase olmadan çalıştırır** (telefon/tarayıcı) |
+| `.\scripts\run_dev.ps1` | Gerçek uygulamayı çalıştırır (Firebase gerekir) |
 | `flutter analyze` | Statik analiz (uyarı vermemeli) |
 | `flutter test` | 25 test |
 | `dart run build_runner build` | Model değişikliğinden sonra |
