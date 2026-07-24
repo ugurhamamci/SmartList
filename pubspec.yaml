@@ -78,3 +78,13 @@ flutter:
   assets:
     - assets/images/
     - assets/lottie/
+
+  # Hanken Grotesk uygulamaya gömülüdür; google_fonts paketinin çalışma anında
+  # indirmesine bırakılmaz. Sebep: indirme ilk açılışta ağ gerektirir, yazı
+  # tipi geç yüklendiği için görünür bir sıçrama olur ve testler ağ olmadan
+  # çalışmaz. Tek dosyalık değişken font (100..900) üç statik dosyadan küçüktür.
+  # Lisans: assets/fonts/OFL.txt (SIL Open Font License 1.1)
+  fonts:
+    - family: Hanken Grotesk
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-Variable.ttf

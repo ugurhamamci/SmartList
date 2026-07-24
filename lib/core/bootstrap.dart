@@ -6,6 +6,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:smartlist/core/config/app_config.dart';
 import 'package:smartlist/core/config/firebase_options.dart';
@@ -28,6 +29,11 @@ Future<void> bootstrap(Widget Function() appBuilder) async {
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Hanken Grotesk uygulamaya gömülü. Bu bayrak, herhangi bir kod yolunun
+      // yazı tipini kazayla ağdan çekmesini engeller: fetch denemesi sessizce
+      // ağa çıkmak yerine hata verir.
+      GoogleFonts.config.allowRuntimeFetching = false;
 
       try {
         await Firebase.initializeApp(
