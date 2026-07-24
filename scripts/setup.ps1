@@ -70,11 +70,24 @@ Yaz-Baslik '3/5  Kod uretiliyor (Freezed + json_serializable)'
 Write-Host '    Bu adim ilk seferde birkac dakika surebilir.'
 & dart run build_runner build
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ''
-    Write-Host 'Kod uretimi basarisiz.' -ForegroundColor Red
-    Write-Host 'Cakisma varsa su komutu deneyin:' -ForegroundColor Yellow
-    Write-Host '  dart run build_runner build --delete-conflicting-outputs'
-    throw 'build_runner basarisiz oldu.'
+    # En sik sebep, onbellekte kalmis eski cikti. `clean` onbellegi silip
+    # sonraki derlemeyi sifirdan yapmaya zorlar. (Eski surumlerdeki
+    # --delete-conflicting-outputs bayragi bu build_runner surumunde yok.)
+    Yaz-Uyari 'Kod uretimi basarisiz. Onbellek temizlenip tekrar denenecek.'
+    & dart run build_runner clean
+    & dart run build_runner build
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ''
+        Write-Host 'Kod uretimi temizlikten sonra da basarisiz oldu.' -ForegroundColor Red
+        Write-Host 'Sirayla su komutlari deneyin:' -ForegroundColor Yellow
+        Write-Host '  flutter clean'
+        Write-Host '  flutter pub get'
+        Write-Host '  dart run build_runner build'
+        Write-Host ''
+        Write-Host 'Hata devam ederse yukaridaki cikti ile birlikte bildirin.'
+        throw 'build_runner basarisiz oldu.'
+    }
 }
 Yaz-Tamam 'Uretilen kod guncel'
 
@@ -111,9 +124,13 @@ if ($analizSonuc -eq 0 -and $testSonuc -eq 0) {
 }
 
 Write-Host ''
-Write-Host 'Siradaki adim: Firebase degerlerini tanimlayin.' -ForegroundColor White
+Write-Host 'ARAYUZU HEMEN GORMEK ICIN (Firebase gerekmez):' -ForegroundColor White
+Write-Host '  .\scripts\run_preview.ps1              # bagli telefon veya emulator'
+Write-Host '  .\scripts\run_preview.ps1 -Device chrome   # tarayicida'
+Write-Host ''
+Write-Host 'GERCEK UYGULAMAYI CALISTIRMAK ICIN (Firebase gerekir):' -ForegroundColor White
 Write-Host '  1. Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1'
-Write-Host '  2. defines.local.ps1 icindeki degerleri doldurun'
+Write-Host '  2. defines.local.ps1 icindeki Firebase degerlerini doldurun'
 Write-Host '  3. .\scripts\run_dev.ps1'
 Write-Host ''
 Write-Host 'Ayrintili anlatim: docs\KURULUM.md'

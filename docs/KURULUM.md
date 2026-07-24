@@ -554,17 +554,30 @@ uygulayın.
 
 ---
 
-### `build_runner` çakışma hatası
+### `build_runner` hata veriyor / çakışma bildiriyor
 
-```
-Conflicting outputs were detected
-```
-
-Çözüm:
+Önbellekte kalmış eski çıktı en sık sebeptir. Önbelleği silip sıfırdan üretin:
 
 ```powershell
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner clean
+dart run build_runner build
 ```
+
+`setup.ps1` bunu zaten kendisi dener; elle çalıştırıyorsanız bu iki komut.
+
+Sürmesi hâlinde:
+
+```powershell
+flutter clean
+flutter pub get
+dart run build_runner build
+```
+
+> ⚠️ **`--delete-conflicting-outputs` bayrağını kullanmayın.** İnternetteki
+> eski anlatımlarda geçer ama bu projedeki build_runner sürümünde **kaldırıldı**.
+> Yazarsanız `These options have been removed and were ignored` uyarısı alırsınız;
+> bir harf hatası olursa da komut tümden hata verir. Karşılığı
+> `build_runner clean` komutudur.
 
 ---
 
