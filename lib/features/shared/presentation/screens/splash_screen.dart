@@ -27,6 +27,13 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
+/// Açılış logosunun kenar uzunluğu.
+const double _logoSize = 128;
+
+/// Kaynak görselin köşe yarıçapının kenar uzunluğuna oranı. Görselden
+/// ölçüldü; beyaz köşeleri kesmek için kullanılır.
+const double _logoCornerRatio = 0.23;
+
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
@@ -77,21 +84,37 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
-                Container(
-                      width: 96,
-                      height: 96,
+                // Logo. Kaynak görselin köşeleri beyaz olduğu için kendi
+                // yuvarlaklığı kadar kırpılıyor; aksi hâlde yüzeyin üzerinde
+                // dört köşede açık bir çerçeve görünür.
+                DecoratedBox(
                       decoration: BoxDecoration(
-                        color: scheme.primaryContainer,
                         borderRadius: BorderRadius.circular(
-                          DesignTokens.radius2xl,
+                          _logoSize * _logoCornerRatio,
                         ),
                         boxShadow: DesignTokens.fabShadow,
                       ),
-                      child: Icon(
-                        Icons.shopping_basket,
-                        size: 48,
-                        color: scheme.onPrimary,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          _logoSize * _logoCornerRatio,
+                        ),
+                        child: Image.asset(
+                          'assets/images/smartlist_logo.png',
+                          width: _logoSize,
+                          height: _logoSize,
+                          fit: BoxFit.cover,
+                          // Görsel yüklenemezse ekran boş kalmasın.
+                          errorBuilder: (_, _, _) => Container(
+                            width: _logoSize,
+                            height: _logoSize,
+                            color: scheme.primaryContainer,
+                            child: Icon(
+                              Icons.shopping_basket,
+                              size: _logoSize / 2,
+                              color: scheme.onPrimary,
+                            ),
+                          ),
+                        ),
                       ),
                     )
                     .animate()
@@ -103,20 +126,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     )
                     .fadeIn(duration: 400.ms),
 
-                const SizedBox(height: DesignTokens.space6),
-
-                // Uygulama adı
-                Text(
-                      'SmartList',
-                      style: theme.textTheme.displayLarge?.copyWith(
-                        color: scheme.primary,
-                      ),
-                    )
-                    .animate(delay: 350.ms)
-                    .fadeIn(duration: 500.ms)
-                    .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
-
-                const SizedBox(height: DesignTokens.space2),
+                const SizedBox(height: DesignTokens.space8),
 
                 // Alt başlık
                 Text(
@@ -125,7 +135,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         color: scheme.onSurfaceVariant,
                       ),
                     )
-                    .animate(delay: 650.ms)
+                    .animate(delay: 450.ms)
                     .fadeIn(duration: 500.ms)
                     .slideY(begin: 0.4, end: 0, curve: Curves.easeOutCubic),
               ],

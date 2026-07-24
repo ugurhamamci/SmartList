@@ -213,7 +213,11 @@ class DashboardView extends StatelessWidget {
   }
 }
 
-/// Üst çubuk: logo, uygulama adı, arama ve profil avatarı.
+/// Üst çubuktaki marka logosunun yüksekliği. Tasarımdaki 28px'lik
+/// `display-lg-mobile` başlığıyla aynı optik ağırlıkta durur.
+const double _brandHeight = 30;
+
+/// Üst çubuk: marka logosu, arama ve profil avatarı.
 class _DashboardAppBar extends StatelessWidget {
   const _DashboardAppBar({
     this.userAvatar,
@@ -240,31 +244,22 @@ class _DashboardAppBar extends StatelessWidget {
       scrolledUnderElevation: 1,
       toolbarHeight: DesignTokens.touchTarget + DesignTokens.space4,
       titleSpacing: spacing.containerMargin,
-      title: Row(
-        children: [
-          // Logo: tasarım uzak bir görsel kullanıyor. Varlık olarak logo
-          // verilmediği için marka renginde bir yer tutucu çiziliyor.
-          Container(
-            width: DesignTokens.avatarMedium,
-            height: DesignTokens.avatarMedium,
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
-            ),
-            child: Icon(
-              Icons.shopping_basket,
-              size: DesignTokens.iconSmall + 2,
-              color: scheme.onPrimary,
-            ),
-          ),
-          const SizedBox(width: DesignTokens.space3),
-          Text(
+      // Yatay marka logosu. Kare ikon zaten "SmartList" yazısını içerdiği
+      // için ikinci kez metin yazılmıyor — kelime iki kez görünmesin.
+      title: Align(
+        alignment: Alignment.centerLeft,
+        child: Image.asset(
+          'assets/images/smartlist_brand.png',
+          height: _brandHeight,
+          fit: BoxFit.contain,
+          // Görsel yüklenemezse başlık kaybolmasın.
+          errorBuilder: (_, _, _) => Text(
             'SmartList',
             style: theme.textTheme.displayMedium?.copyWith(
               color: scheme.primary,
             ),
           ),
-        ],
+        ),
       ),
       actions: [
         PressScale(
