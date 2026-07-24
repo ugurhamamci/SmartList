@@ -1,0 +1,38 @@
+# Normalise line endings in the repository to LF regardless of each developer's
+# core.autocrlf setting. CI runs `dart format --set-exit-if-changed` on Linux,
+# so a CRLF blob checked in from Windows would fail the format check.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF to remain executable there.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Explicitly binary, so Git never tries to normalise or diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jks binary
+*.keystore binary
+*.p12 binary
+*.zip binary
+*.jar binary
+*.aab binary
+*.apk binary
+*.ipa binary
+
+# Generated Dart output is tracked (CI verifies it is not stale) but collapsing
+# it in diffs and excluding it from language statistics keeps reviews readable.
+*.g.dart linguist-generated=true
+*.freezed.dart linguist-generated=true
+lib/l10n/generated/** linguist-generated=true
+
+# Lockfile: tracked, but not worth reviewing line by line.
+pubspec.lock -diff linguist-generated=true

@@ -1,0 +1,92 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ---------------------------------------------------------------------------
+# Signing material — never commit. CI restores these from repository secrets;
+# see .github/workflows/ci.yml.
+# ---------------------------------------------------------------------------
+android/key.properties
+*.jks
+*.keystore
+*.p12
+*.p8
+*.pem
+*.mobileprovision
+*.cer
+ios/Runner/GoogleService-Info.plist
+
+# ---------------------------------------------------------------------------
+# Environment and Firebase project configuration.
+# This project passes every Firebase identifier through --dart-define, so no
+# generated config file belongs in version control. See README.md.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+android/app/google-services.json
+lib/firebase_options.dart
+
+# Firebase CLI local output
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+database-debug.log
+pubsub-debug.log
+ui-debug.log
+.runtimeconfig.json
+
+# Cloud Functions dependencies
+functions/node_modules/
+functions/lib/
+
+# Local build scripts holding developer-specific defines
+scripts/*.local.ps1
+scripts/*.local.sh
+
+# NOTE: *.g.dart, *.freezed.dart and lib/l10n/generated/ are deliberately NOT
+# ignored. CI regenerates them and fails if the committed output differs, which
+# only works if they are tracked.

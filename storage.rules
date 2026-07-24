@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// SmartList — Cloud Storage Security Rules
+//
+// Object layout:
+//   users/{userId}/avatar/{fileName}          profile pictures
+//   lists/{listId}/items/{itemId}/{fileName}  product photos
+//   lists/{listId}/chat/{messageId}/{fileName} chat images and voice notes
+//
+// Membership cannot be read from Firestore inside Storage rules, so write
+// access is scoped by path ownership and the client obtains a list-scoped
+// upload only after Firestore has already authorised it. Cloud Functions
+// validate orphaned objects and prune them.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isAudio() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
+    function withinSize(megabytes) {
+      return request.resource.size < megabytes * 1024 * 1024;
+    }
+
+    // ------------------------------------------------------------- avatars
+    // Readable by any signed-in user so collaborators render in member lists.
+
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSelf(userId) && isImage() && withinSize(5);
+      allow delete: if isSelf(userId);
+    }
+
+    // --------------------------------------------------------- item photos
+
+    match /lists/{listId}/items/{itemId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImage() && withinSize(10);
+      allow delete: if isSignedIn();
+    }
+
+    // ------------------------------------------------- chat attachments
+
+    match /lists/{listId}/chat/{messageId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && (
+                     (isImage() && withinSize(10))
+                     || (isAudio() && withinSize(25))
+                   );
+      allow delete: if isSignedIn();
+    }
+
+    // ------------------------------------------- bug report attachments
+
+    match /bug_reports/{reportId}/{fileName} {
+      allow read: if false;
+      allow write: if isSignedIn() && isImage() && withinSize(10);
+    }
+
+    // Everything else is denied.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

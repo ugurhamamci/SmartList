@@ -1,0 +1,512 @@
+rules_version = '2';
+
+// SmartList — Cloud Firestore Security Rules
+//
+// Role model (stored denormalised on each shopping list as `memberRoles: map<uid, role>`
+// so that a single parent document read authorises every subcollection operation):
+//
+//   owner  — full control, sole role permitted to delete or transfer a list
+//   editor — may create / update / delete items, send chat messages, invite members
+//   viewer — read-only, except that it may toggle an item's completion state
+//   guest  — strictly read-only
+//
+// Every mutable document carries audit metadata: createdBy, createdAt, updatedBy,
+// updatedAt, deletedAt (soft delete) and version (optimistic concurrency).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- identity
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && uid() == userId;
+    }
+
+    // Privileged backend access (Cloud Functions use the Admin SDK and bypass
+    // these rules entirely; this covers custom-claim service identities).
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.get('admin', false) == true;
+    }
+
+    // ------------------------------------------------------------ audit fields
+
+    function createdAudit() {
+      return request.resource.data.createdBy == uid()
+          && request.resource.data.updatedBy == uid()
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.version == 1
+          && request.resource.data.deletedAt == null;
+    }
+
+    function updatedAudit() {
+      return request.resource.data.updatedBy == uid()
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.version == resource.data.version + 1;
+    }
+
+    // A soft delete is an update that stamps deletedAt; it may not resurrect.
+    function isSoftDelete() {
+      return request.resource.data.deletedAt == request.time
+          && resource.data.deletedAt == null;
+    }
+
+    function isNotSoftDeleted() {
+      return resource.data.deletedAt == null;
+    }
+
+    // Restricts an update to a known set of field names.
+    function onlyChanged(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(fields);
+    }
+
+    // --------------------------------------------------------------- list roles
+
+    function listPath(listId) {
+      return /databases/$(database)/documents/shopping_lists/$(listId);
+    }
+
+    function listExists(listId) {
+      return exists(listPath(listId));
+    }
+
+    function listData(listId) {
+      return get(listPath(listId)).data;
+    }
+
+    function roleOn(listId) {
+      return listExists(listId)
+          ? listData(listId).memberRoles.get(uid(), 'none')
+          : 'none';
+    }
+
+    function isMemberOf(listId) {
+      return isSignedIn() && roleOn(listId) != 'none';
+    }
+
+    function isOwnerOf(listId) {
+      return roleOn(listId) == 'owner';
+    }
+
+    function canEdit(listId) {
+      return roleOn(listId) in ['owner', 'editor'];
+    }
+
+    // Roles that may only flip completion state on an item.
+    function canComplete(listId) {
+      return roleOn(listId) in ['owner', 'editor', 'viewer'];
+    }
+
+    // Membership evaluated against the incoming list document rather than the
+    // stored one — used when validating list creation.
+    function isIncomingOwner() {
+      return request.resource.data.ownerId == uid()
+          && request.resource.data.memberRoles.get(uid(), 'none') == 'owner'
+          && uid() in request.resource.data.memberIds;
+    }
+
+    // Membership bookkeeping must stay internally consistent.
+    function membershipConsistent() {
+      return request.resource.data.memberIds.toSet()
+             == request.resource.data.memberRoles.keys().toSet()
+          && request.resource.data.memberCount
+             == request.resource.data.memberIds.size();
+    }
+
+    // =========================================================== users
+
+    match /users/{userId} {
+      // Any signed-in user may read a profile: collaborator avatars, names and
+      // presence are shown throughout the collaborative UI.
+      allow get, list: if isSignedIn();
+
+      allow create: if isSelf(userId)
+                    && createdAudit()
+                    && request.resource.data.id == userId
+                    && request.resource.data.email == request.auth.token.email
+                    // Entitlements are owned by the backend, never the client.
+                    && request.resource.data.isPremium == false
+                    && request.resource.data.subscriptionTier == 'free';
+
+      allow update: if (isSelf(userId) || isAdmin())
+                    && updatedAudit()
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.email == resource.data.email
+                    && (isAdmin() || (
+                         request.resource.data.isPremium == resource.data.isPremium
+                      && request.resource.data.subscriptionTier == resource.data.subscriptionTier
+                    ));
+
+      // Accounts are erased by the account-deletion Cloud Function so that
+      // owned lists, storage objects and auth records are cleaned up together.
+      allow delete: if false;
+
+      match /settings/{settingId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /device_tokens/{tokenId} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId)
+                      && request.resource.data.userId == userId
+                      && request.resource.data.token is string;
+        allow update, delete: if isSelf(userId);
+      }
+
+      match /favorites/{favoriteId} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && request.resource.data.userId == userId;
+        allow update, delete: if isSelf(userId);
+      }
+
+      match /recent_searches/{searchId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /barcode_history/{scanId} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && request.resource.data.userId == userId;
+        allow update, delete: if isSelf(userId);
+      }
+
+      match /voice_commands/{commandId} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && request.resource.data.userId == userId;
+        allow update, delete: if isSelf(userId);
+      }
+
+      // Aggregated by Cloud Functions from activity logs; clients only read.
+      match /statistics/{periodId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
+      // Fanned out by Cloud Functions; the owner may mark read or dismiss.
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+        allow create: if false;
+        allow update: if isSelf(userId)
+                      && onlyChanged(['isRead', 'readAt', 'updatedAt', 'updatedBy', 'version', 'deletedAt']);
+        allow delete: if isSelf(userId);
+      }
+    }
+
+    // ================================================== shopping_lists
+
+    match /shopping_lists/{listId} {
+      allow get: if isMemberOf(listId);
+
+      // Client queries must be constrained to `memberIds array-contains uid`;
+      // this rule rejects any broader listing.
+      allow list: if isSignedIn()
+                  && uid() in resource.data.memberIds;
+
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && isIncomingOwner()
+                    && membershipConsistent()
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 120
+                    && request.resource.data.isArchived == false;
+
+      // Owners may change anything, including membership and archival state.
+      // Editors may edit list metadata but never membership or ownership.
+      allow update: if isSignedIn()
+                    && updatedAudit()
+                    && membershipConsistent()
+                    && (
+                      (isOwnerOf(listId) && request.resource.data.ownerId is string)
+                      || (
+                        canEdit(listId)
+                        && request.resource.data.ownerId == resource.data.ownerId
+                        && request.resource.data.memberRoles == resource.data.memberRoles
+                        && request.resource.data.memberIds == resource.data.memberIds
+                      )
+                      // Viewers and guests may only maintain their own
+                      // completion counters via the aggregate fields below.
+                      || (
+                        canComplete(listId)
+                        && onlyChanged(['completedItemCount', 'updatedAt', 'updatedBy', 'version'])
+                      )
+                    );
+
+      // Hard delete is reserved for owners; the UI performs a soft delete first.
+      allow delete: if isOwnerOf(listId);
+
+      // ------------------------------------------------------------- items
+
+      match /items/{itemId} {
+        allow get: if isMemberOf(listId);
+        allow list: if isMemberOf(listId);
+
+        allow create: if canEdit(listId)
+                      && createdAudit()
+                      && request.resource.data.listId == listId
+                      && request.resource.data.name is string
+                      && request.resource.data.name.size() > 0
+                      && request.resource.data.name.size() <= 200
+                      && request.resource.data.quantity is number
+                      && request.resource.data.quantity > 0;
+
+        allow update: if isNotSoftDeleted()
+                      && updatedAudit()
+                      && request.resource.data.listId == resource.data.listId
+                      && (
+                        canEdit(listId)
+                        // Viewers may only toggle completion and stamp who
+                        // purchased the item.
+                        || (
+                          canComplete(listId)
+                          && onlyChanged([
+                               'isCompleted', 'completedAt', 'purchasedBy', 'purchasedAt',
+                               'updatedAt', 'updatedBy', 'version'
+                             ])
+                        )
+                      );
+
+        allow delete: if canEdit(listId);
+      }
+
+      // ----------------------------------------------------------- members
+
+      match /members/{memberId} {
+        allow get, list: if isMemberOf(listId);
+
+        // Membership is mutated by the invitation Cloud Functions so that the
+        // denormalised role map on the parent list can never drift.
+        allow create, update: if isOwnerOf(listId);
+
+        // An owner may remove anyone; any member may remove themselves (leave).
+        allow delete: if isOwnerOf(listId) || isSelf(memberId);
+      }
+
+      // ------------------------------------------------------ activity_logs
+
+      match /activity_logs/{logId} {
+        allow get, list: if isMemberOf(listId);
+        allow create: if isMemberOf(listId)
+                      && request.resource.data.actorId == uid()
+                      && request.resource.data.listId == listId;
+        // Audit trail is append-only.
+        allow update, delete: if false;
+      }
+
+      // -------------------------------------------------------- invitations
+
+      match /invitations/{invitationId} {
+        allow get, list: if isMemberOf(listId)
+                         || (isSignedIn()
+                             && resource.data.inviteeEmail == request.auth.token.email);
+
+        allow create: if canEdit(listId)
+                      && createdAudit()
+                      && request.resource.data.listId == listId
+                      && request.resource.data.status == 'pending'
+                      && request.resource.data.invitedBy == uid()
+                      && request.resource.data.role in ['editor', 'viewer', 'guest'];
+
+        // The invitee accepts or declines; an inviter may revoke.
+        allow update: if (
+                        isSignedIn()
+                        && resource.data.inviteeEmail == request.auth.token.email
+                        && request.resource.data.status in ['accepted', 'declined']
+                        && onlyChanged(['status', 'respondedAt', 'inviteeId', 'updatedAt', 'updatedBy', 'version'])
+                      ) || (
+                        canEdit(listId)
+                        && request.resource.data.status == 'revoked'
+                        && onlyChanged(['status', 'revokedAt', 'updatedAt', 'updatedBy', 'version'])
+                      );
+
+        allow delete: if isOwnerOf(listId);
+      }
+
+      // ---------------------------------------------------------- presence
+
+      match /presence/{presenceId} {
+        allow get, list: if isMemberOf(listId);
+        // A member may only publish their own presence heartbeat.
+        allow write: if isMemberOf(listId) && isSelf(presenceId);
+      }
+    }
+
+    // ====================================================== chat_rooms
+    // A chat room's document id equals the id of the list it belongs to.
+
+    match /chat_rooms/{roomId} {
+      allow get: if isMemberOf(roomId);
+      allow list: if isSignedIn() && uid() in resource.data.memberIds;
+
+      allow create: if isOwnerOf(roomId)
+                    && createdAudit()
+                    && request.resource.data.listId == roomId;
+
+      allow update: if isMemberOf(roomId)
+                    && updatedAudit()
+                    && request.resource.data.listId == resource.data.listId;
+
+      allow delete: if isOwnerOf(roomId);
+
+      match /messages/{messageId} {
+        allow get, list: if isMemberOf(roomId);
+
+        // Guests may read the conversation but not contribute to it.
+        allow create: if canComplete(roomId)
+                      && createdAudit()
+                      && request.resource.data.roomId == roomId
+                      && request.resource.data.senderId == uid()
+                      && request.resource.data.type in ['text', 'image', 'voice', 'system'];
+
+        // The author may edit their own body; any member may add a reaction or
+        // register a read receipt on someone else's message.
+        allow update: if isNotSoftDeleted()
+                      && updatedAudit()
+                      && (
+                        (resource.data.senderId == uid()
+                         && onlyChanged(['body', 'isEdited', 'editedAt', 'updatedAt', 'updatedBy', 'version', 'deletedAt']))
+                        || (canComplete(roomId)
+                            && onlyChanged(['reactions', 'readBy', 'updatedAt', 'updatedBy', 'version']))
+                      );
+
+        allow delete: if resource.data.senderId == uid() || isOwnerOf(roomId);
+      }
+
+      match /typing/{typingId} {
+        allow get, list: if isMemberOf(roomId);
+        allow write: if isMemberOf(roomId) && isSelf(typingId);
+      }
+    }
+
+    // ======================================================= categories
+    // Global categories (ownerId == null) are seeded by the backend and are
+    // readable by everyone; user-defined categories are private.
+
+    match /categories/{categoryId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && request.resource.data.ownerId == uid();
+
+      allow update, delete: if isSignedIn()
+                            && resource.data.ownerId == uid();
+    }
+
+    // =============================================== shopping_templates
+    // Templates are either public (curated, backend-authored) or user-owned.
+
+    match /shopping_templates/{templateId} {
+      allow get, list: if isSignedIn()
+                       && (resource.data.isPublic == true
+                           || resource.data.ownerId == uid());
+
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && request.resource.data.ownerId == uid()
+                    && request.resource.data.isPublic == false;
+
+      allow update: if isSignedIn()
+                    && resource.data.ownerId == uid()
+                    && updatedAudit()
+                    && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if isSignedIn() && resource.data.ownerId == uid();
+    }
+
+    // ==================================================== shared_links
+    // Unauthenticated resolution is intentional: a share link must be openable
+    // before sign-up. The document exposes only the target list id and its
+    // grant, never list contents.
+
+    match /shared_links/{linkId} {
+      allow get: if resource.data.isActive == true
+                 && resource.data.deletedAt == null;
+      allow list: if isSignedIn() && isMemberOf(resource.data.listId);
+
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && canEdit(request.resource.data.listId)
+                    && request.resource.data.role in ['editor', 'viewer', 'guest'];
+
+      allow update, delete: if isSignedIn() && isOwnerOf(resource.data.listId);
+    }
+
+    // =================================================== subscriptions
+    // Written exclusively by the billing Cloud Functions / webhooks.
+
+    match /subscriptions/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /premium_features/{featureId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /roles/{roleId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /permissions/{permissionId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ================================================ feedback & bugs
+    // Submit-only: a reporter may file and read their own reports, and support
+    // staff read everything.
+
+    match /feedback/{feedbackId} {
+      allow get: if isSignedIn()
+                 && (resource.data.createdBy == uid() || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() > 0
+                    && request.resource.data.message.size() <= 5000;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /bug_reports/{reportId} {
+      allow get: if isSignedIn()
+                 && (resource.data.createdBy == uid() || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+                    && createdAudit()
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================== analytics_events
+    // Write-only sink for product events that must be queryable in Firestore
+    // alongside Firebase Analytics. Clients never read the stream back.
+
+    match /analytics_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && request.resource.data.name is string
+                    && request.resource.data.occurredAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // Anything not matched above is denied.
+  }
+}
