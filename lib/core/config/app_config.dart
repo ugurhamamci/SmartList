@@ -22,6 +22,8 @@ final class AppConfig {
     required this.anthropicApiKey,
     required this.openRouterApiKey,
     required this.openRouterModel,
+    required this.supabaseUrl,
+    required this.supabaseAnonKey,
   });
 
   /// Builds the configuration from the ambient `--dart-define` values.
@@ -66,6 +68,8 @@ final class AppConfig {
         'OPENROUTER_MODEL',
         defaultValue: 'openai/gpt-oss-20b:free',
       ),
+      supabaseUrl: const String.fromEnvironment('SUPABASE_URL'),
+      supabaseAnonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
     );
   }
 
@@ -93,6 +97,20 @@ final class AppConfig {
 
   /// OpenRouter model kimligi (orn. `openai/gpt-oss-20b:free`).
   final String openRouterModel;
+
+  /// Supabase proje adresi (`https://<ref>.supabase.co`).
+  final String supabaseUrl;
+
+  /// Yayinlanabilir (`publishable` / eski adiyla `anon`) anahtar.
+  ///
+  /// Istemciye gomulmesi TASARIM GEREGI guvenli: kimin neyi gorebilecegine
+  /// RLS politikalari karar veriyor, anahtar degil. `secret` anahtar ise
+  /// RLS'i tamamen atlar ve uygulamaya ASLA konmaz.
+  final String supabaseAnonKey;
+
+  /// Supabase kullanilabilir durumda mi. Ikisinden biri eksikse uygulama
+  /// hangi degiskenin eksik oldugunu soyleyen bir ekranla aciliyor.
+  bool get hasSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// True when requests should be routed through the server-side proxy.
   bool get useAiProxy => aiProxyBaseUrl.isNotEmpty;
