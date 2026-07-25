@@ -1,27 +1,23 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:smartlist/core/config/app_config.dart';
-import 'package:smartlist/core/config/firebase_options.dart';
 import 'package:smartlist/core/database/local_cache.dart';
 import 'package:smartlist/core/errors/error_mapper.dart';
 import 'package:smartlist/core/utils/app_logger.dart';
 import 'package:smartlist/providers/core_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Starts the application.
+/// Uygulamayı başlatır.
 ///
-/// Every initialisation step that can fail is contained: a failure produces a
-/// diagnostic screen rather than a blank window, because a crash before
-/// `runApp` leaves the user with no way to understand or report the problem.
-/// The whole startup runs inside `runZonedGuarded` so an asynchronous error
-/// raised during initialisation is still reported.
+/// Başarısız olabilecek her adım kapsanıyor: bir hata boş pencere yerine
+/// tanılama ekranı üretiyor, çünkü `runApp` öncesinde çöken bir uygulama
+/// kullanıcıya sorunu anlama ya da bildirme şansı bırakmıyor. Başlangıcın
+/// tamamı `runZonedGuarded` içinde koşuyor; böylece kurulum sırasında oluşan
+/// asenkron bir hata da raporlanıyor.
 Future<void> bootstrap(Widget Function() appBuilder) async {
   final config = AppConfig.fromEnvironment();
   AppLogger.configure(verbose: config.verboseLogging);
@@ -35,25 +31,60 @@ Future<void> bootstrap(Widget Function() appBuilder) async {
       // ağa çıkmak yerine hata verir.
       GoogleFonts.config.allowRuntimeFetching = false;
 
-      try {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
+      _installErrorHandlers(config);
+
+      // Yapılandırma eksikse hangi değerin eksik olduğunu söyleyip duruyoruz.
+      // Devam etmek her sorguyu anlaşılmaz bir ağ hatasına çevirirdi.
+      if (!config.hasSupabase) {
+        AppLogger.fatal(
+          'Supabase yapılandırması eksik',
+          StateError('SUPABASE_URL / SUPABASE_ANON_KEY verilmedi'),
+          StackTrace.current,
         );
-      } on Object catch (error, stackTrace) {
-        AppLogger.fatal('Firebase initialisation failed', error, stackTrace);
-        runApp(_StartupFailureApp(error: error, config: config));
+        runApp(
+          _StartupFailureApp(
+            config: config,
+            title: 'Sunucu bağlantısı yapılandırılmamış',
+            explanation:
+                'Uygulama SUPABASE_URL ve SUPABASE_ANON_KEY değerleriyle '
+                'derlenmedi. scripts/defines.local.ps1 dosyasını doldurup '
+                'scripts/run_dev.ps1 ile çalıştırın; ayrıntı için '
+                'docs/KURULUM.md.',
+          ),
+        );
         return;
       }
 
-      _installErrorHandlers(config);
+      try {
+        // `publishableKey` yeni anahtar biçimi (`sb_publishable_...`) için
+        // doğru parametre; `anonKey` kullanımdan kaldırıldı. PKCE akışı ve
+        // oturumun kalıcı olması SDK'nın öntanımlısı, açıkça yazmıyoruz.
+        await Supabase.initialize(
+          url: config.supabaseUrl,
+          publishableKey: config.supabaseAnonKey,
+          debug: config.verboseLogging,
+        );
+      } on Object catch (error, stackTrace) {
+        AppLogger.fatal('Supabase başlatılamadı', error, stackTrace);
+        runApp(
+          _StartupFailureApp(
+            config: config,
+            error: error,
+            title: 'Sunucuya bağlanılamadı',
+            explanation:
+                'Supabase istemcisi başlatılamadı. İnternet bağlantınızı ve '
+                'SUPABASE_URL değerinin doğruluğunu kontrol edin.',
+          ),
+        );
+        return;
+      }
 
       try {
-        await _configureFirestore(config);
         await LocalCache.initialize();
       } on Object catch (error, stackTrace) {
-        // Persistence is an optimisation, not a requirement: log and continue
-        // so the app still works against the network.
-        AppLogger.error('Local persistence unavailable', error, stackTrace);
+        // Yerel önbellek bir iyileştirme, zorunluluk değil: günlüğe yazıp
+        // devam ediyoruz, uygulama ağ üzerinden çalışmaya devam eder.
+        AppLogger.error('Yerel önbellek kullanılamıyor', error, stackTrace);
       }
 
       runApp(
@@ -64,75 +95,53 @@ Future<void> bootstrap(Widget Function() appBuilder) async {
       );
     },
     (error, stackTrace) {
-      AppLogger.fatal('Uncaught zone error', error, stackTrace);
-      if (config.enableCrashlytics) {
-        unawaited(
-          FirebaseCrashlytics.instance.recordError(
-            error,
-            stackTrace,
-            fatal: true,
-          ),
-        );
-      }
+      AppLogger.fatal('Yakalanmayan bölge hatası', error, stackTrace);
     },
   );
 }
 
-/// Routes framework and platform errors into the logger and Crashlytics.
+/// Framework ve platform hatalarını günlüğe yönlendirir.
 void _installErrorHandlers(AppConfig config) {
-  final crashlytics = FirebaseCrashlytics.instance;
-
   FlutterError.onError = (details) {
     AppLogger.error(
-      'Flutter framework error',
+      'Flutter framework hatası',
       details.exception,
       details.stack,
     );
-    if (config.enableCrashlytics) {
-      unawaited(crashlytics.recordFlutterError(details));
-    } else {
-      FlutterError.presentError(details);
-    }
+    // Hata raporlama servisi bağlanana kadar hata konsola da basılıyor;
+    // sessizce yutmak sorunu görünmez yapardı.
+    FlutterError.presentError(details);
   };
 
-  // Errors that escape the Flutter framework entirely, e.g. from a platform
-  // channel callback.
+  // Flutter framework'ünün tamamen dışında kalan hatalar, örneğin bir platform
+  // kanalı geri çağrısından gelenler.
   PlatformDispatcher.instance.onError = (error, stackTrace) {
     final mapped = ErrorMapper.map(error, stackTrace);
     AppLogger.fatal(
-      'Unhandled platform error: ${mapped.code}',
+      'Ele alınmayan platform hatası: ${mapped.code}',
       error,
       stackTrace,
     );
-    if (config.enableCrashlytics) {
-      unawaited(crashlytics.recordError(error, stackTrace, fatal: true));
-    }
     return true;
   };
-
-  unawaited(
-    crashlytics.setCrashlyticsCollectionEnabled(config.enableCrashlytics),
-  );
 }
 
-Future<void> _configureFirestore(AppConfig config) async {
-  FirebaseFirestore.instance.settings = Settings(
-    persistenceEnabled: config.enableFirestorePersistence,
-    cacheSizeBytes: config.enableFirestorePersistence
-        ? Settings.CACHE_SIZE_UNLIMITED
-        : null,
-  );
-}
-
-/// Shown when the app cannot initialise at all.
+/// Uygulama hiç başlayamadığında gösterilir.
 ///
-/// Names the missing configuration explicitly, since the usual cause is a build
-/// launched without the required `--dart-define` values.
+/// Eksik yapılandırmayı açıkça söylüyor: en sık neden, gereken
+/// `--dart-define` değerleri verilmeden başlatılmış bir derleme.
 class _StartupFailureApp extends StatelessWidget {
-  const _StartupFailureApp({required this.error, required this.config});
+  const _StartupFailureApp({
+    required this.config,
+    required this.title,
+    required this.explanation,
+    this.error,
+  });
 
-  final Object error;
   final AppConfig config;
+  final String title;
+  final String explanation;
+  final Object? error;
 
   @override
   Widget build(BuildContext context) {
@@ -149,17 +158,11 @@ class _StartupFailureApp extends StatelessWidget {
               children: [
                 const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 16),
-                Text(
-                  'SmartList could not start',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                Text(title, style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 12),
-                const Text(
-                  'Firebase could not be initialised. Check that the build '
-                  'supplies the required --dart-define values; see README.md.',
-                ),
+                Text(explanation),
                 const SizedBox(height: 16),
-                if (kDebugMode)
+                if (kDebugMode && error != null)
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(

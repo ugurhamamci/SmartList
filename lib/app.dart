@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:smartlist/core/theme/app_theme.dart';
 import 'package:smartlist/core/theme/design_tokens.dart';
-import 'package:smartlist/features/shared/presentation/screens/build_status_screen.dart';
+import 'package:smartlist/features/auth/presentation/screens/auth_gate.dart';
+import 'package:smartlist/features/home/presentation/screens/app_shell.dart';
 import 'package:smartlist/l10n/generated/app_localizations.dart';
 import 'package:smartlist/providers/core_providers.dart';
 
@@ -38,7 +39,9 @@ class SmartListApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const BuildStatusScreen(),
+      // Yonlendirmeyi AuthGate yapiyor: oturum yoksa giris ekrani, varsa
+      // uygulama kabugu. Hicbir ekranin oturumu kendisi denetlemesi gerekmiyor.
+      home: const AuthGate(child: AppShell()),
     );
   }
 }
