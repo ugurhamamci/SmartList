@@ -29,6 +29,16 @@ $ProjeKok = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjeKok
 
 # ------------------------------------------------------- degerleri yukle
+# Flutter PATH'te mi? Olmadiginda hata "flutter taninmiyor" olarak en sonda
+# cikiyor ve sebebi belirsiz gorunuyor; erkenden ve aciklayarak duruyoruz.
+if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
+    Write-Host ''
+    Write-Host 'HATA: flutter komutu bulunamadi.' -ForegroundColor Red
+    Write-Host 'Flutter SDK kurulu degil ya da PATH''e eklenmemis.'
+    Write-Host 'Kurulum: docs/KURULUM.md 3. bolum'
+    exit 1
+}
+
 $yerelDosya = Join-Path $PSScriptRoot 'defines.local.ps1'
 
 if (-not (Test-Path $yerelDosya)) {
@@ -39,6 +49,9 @@ if (-not (Test-Path $yerelDosya)) {
     Write-Host '  Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1'
     Write-Host ''
     Write-Host 'Hangi degerin nereden alinacagi sablonun icinde yazili.'
+    Write-Host ''
+    Write-Host 'Degerler zaten elinizdeyse dosyayi tek komutla olusturabilirsiniz;'
+    Write-Host 'ornegi docs/KURULUM.md 9. bolumde.'
     exit 1
 }
 

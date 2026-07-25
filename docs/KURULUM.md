@@ -409,6 +409,41 @@ Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1
 
 ---
 
+### Tek komutla oluşturma
+
+Değerler elinizdeyse dosyayı editör açmadan yazabilirsiniz. Aşağıdaki bloğun
+tamamını PowerShell'e yapıştırın — kapanış `"@` işareti **satırın en başında**
+olmak zorunda, girintili olursa PowerShell hata verir:
+
+```powershell
+@"
+@{
+    FLAVOR             = 'development'
+    SUPABASE_URL       = 'https://PROJE-REF.supabase.co'
+    SUPABASE_ANON_KEY  = 'sb_publishable_...'
+    AI_PROVIDER        = 'openrouter'
+    OPENROUTER_API_KEY = 'sk-or-v1-...'
+    OPENROUTER_MODEL   = 'openai/gpt-oss-20b:free'
+    VERBOSE_LOGGING    = 'true'
+}
+"@ | Set-Content -Path scriptsdefines.local.ps1 -Encoding utf8
+```
+
+Doğru yazıldığını şöyle görürsünüz — `run_dev.ps1` şu üç satırı basar:
+
+```
+Flavor : development
+Sunucu : https://PROJE-REF.supabase.co
+Define : 7 adet
+```
+
+Bu satırlar çıkmadan hata alırsanız eksik değerin adını söyler.
+
+> `SUPABASE_ANON_KEY` alanına **`sb_secret_` ile başlayan anahtarı yazmayın.**
+> Script bunu yakalayıp duruyor: secret anahtar bütün RLS politikalarını atlar ve
+> uygulamaya konursa APK'dan çıkarılabilir.
+
+
 ## 10. Uygulamayı çalıştırma
 
 ### 10.1 Bir cihaz hazırlayın
