@@ -5,9 +5,9 @@ ortak alışveriş listesi** uygulaması. Tek Flutter kod tabanından Android ve
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.44.8-02569B?logo=flutter)
 ![Dart](https://img.shields.io/badge/Dart-3.12.2-0175C2?logo=dart)
-![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20FCM-FFCA28?logo=firebase)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%7C%20Auth%20%7C%20Realtime-3ECF8E?logo=supabase)
 ![Analiz](https://img.shields.io/badge/flutter%20analyze-0%20uyar%C4%B1-brightgreen)
-![Test](https://img.shields.io/badge/test-54%20ge%C3%A7ti-brightgreen)
+![Test](https://img.shields.io/badge/test-101%20ge%C3%A7ti-brightgreen)
 
 > 📋 **Projenin güncel durumu, neyin çalıştığı ve neyin eksik olduğu:**
 > **[DURUM_RAPORU.md](DURUM_RAPORU.md)**
@@ -28,7 +28,7 @@ cd SmartList
 .\scripts\setup.ps1                                          # paketler, kod üretimi, analiz, test
 
 Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1
-# defines.local.ps1 içindeki Firebase değerlerini doldurun
+# defines.local.ps1 içindeki SUPABASE_URL ve SUPABASE_ANON_KEY değerlerini doldurun
 
 .\scripts\run_dev.ps1                                        # çalıştır
 ```
@@ -37,35 +37,31 @@ Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1
 
 ## 📌 Projenin durumu
 
-Veri, yapılandırma ve servis katmanları **yazıldı ve doğrulandı**:
-
 | Kontrol | Sonuç |
 |---|---|
 | `flutter analyze` | **0 uyarı / 0 hata** |
-| `flutter test` | **25 test geçti** |
-| Kod | 52 elle yazılmış dosya, ~5.100 satır |
-| Model | 28 Freezed sınıfı, 29 enum |
-| Firestore | 28 koleksiyon, rol tabanlı güvenlik kuralları |
+| `flutter test` | **101 test geçti** |
+| `flutter build web --release` | Her iki giriş noktası derleniyor |
+| Kod | 130+ dosya, ~24.000 satır |
+| Model | 22 Freezed sınıfı, 26 enum |
+| Veritabanı | Supabase Postgres: 24 tablo, 45+ RLS politikası, 18 fonksiyon, 55 indeks |
 
-### ⚠️ Arayüz henüz yazılmadı
+**Çalışıyor:** tasarımın tamamı (10 ekran), giriş/kayıt/şifre sıfırlama,
+Google & Apple düğmeleri, profil, ayarlar (tema anında değişiyor),
+istatistikler (fl_chart), premium sayfası, **barkod okuma** (4 açık
+veritabanında arama + kontrol hanesi doğrulaması), **gerçek QR üretimi**,
+sesle ekleme ayrıştırıcısı, sağlayıcıdan bağımsız yapay zekâ katmanı.
 
-Görev tanımında `tasarim.html` arayüzün **tek doğru kaynağı** olarak belirtilmiş
-ve hiçbir görsel değerin değiştirilmemesi istenmişti. Ancak bu dosya **0 bayt**
-geldi — boş. Boş bir kaynaktan üretilecek her renk ve boşluk uydurma olurdu, bu
-yüzden ekranlar yazılmadı.
+**Sırada:** depo katmanı (listeler Postgres'ten okunacak), Realtime
+(iki telefon aynı anda görecek), ayarların kaydedilmesi, sesle ekleme düğmesinin
+bağlanması.
 
-Bunun yerine görsel sistem **tek noktadan değiştirilebilir** kuruldu:
+**Önce yapılması gereken üç Dashboard ayarı var** — kodla yapılamıyor:
+**[docs/SUPABASE_AYARLARI.md](docs/SUPABASE_AYARLARI.md)**. En kritiği:
+e-posta doğrulaması açık olduğu için kayıt olma şu anda saatte 2–3 denemeden
+sonra HTTP 429 veriyor.
 
-- Bütün renk, boşluk, yarıçap, gölge ve süre sabitleri
-  [`lib/core/theme/design_tokens.dart`](lib/core/theme/design_tokens.dart) içinde
-- Hiçbir widget içine görsel değer gömülmedi
-- Mevcut değerler Material 3 varsayılanları ve dosyada bu açıkça yazılı
-
-`tasarim.html` sağlandığında değerleri bu dosyaya aktarmak tüm uygulamanın
-görünümünü değiştirmeye yeter.
-
-Detaylı envanter: **[docs/OZET.md](docs/OZET.md)** (Türkçe) ·
-**[docs/BUILD_STATUS.md](docs/BUILD_STATUS.md)** (İngilizce)
+Detaylı rapor: **[DURUM_RAPORU.md](DURUM_RAPORU.md)**
 
 ---
 
@@ -78,18 +74,18 @@ Detaylı envanter: **[docs/OZET.md](docs/OZET.md)** (Türkçe) ·
 | Durum yönetimi | Riverpod, Flutter Hooks |
 | Navigasyon | Go Router |
 | Modeller | Freezed, json_serializable |
-| Backend | Firebase: Firestore, Auth, Storage, FCM, Analytics, Crashlytics, Functions |
+| Backend | Supabase: Postgres + RLS, Auth, Realtime, Storage, Edge Functions |
 | Ağ | Dio |
 | Yerel depolama | Hive, Flutter Secure Storage |
 | Cihaz | Image Picker, Mobile Scanner, Speech to Text, Permission Handler, Connectivity Plus |
 | Arayüz | Google Fonts, Flutter Animate, Lottie, Cached Network Image, fl_chart |
-| AI | OpenAI, Gemini, Claude (soyutlanmış — tedarikçiye bağımsız) |
+| AI | OpenRouter, Claude, OpenAI, Gemini (soyutlanmış — tedarikçiye bağımsız) |
 
 ---
 
 ## 🔑 Yapılandırma
 
-**Hiçbir Firebase kimliği veya API anahtarı depoda tutulmuyor.** Tüm ortama özel
+**Hiçbir API anahtarı veya proje kimliği depoda tutulmuyor.** Tüm ortama özel
 değerler `--dart-define` ile geliyor; böylece aynı kod tabanı development,
 staging ve production projelerini hedefler.
 
@@ -97,28 +93,25 @@ staging ve production projelerini hedefler.
 
 | Değişken | Açıklama |
 |---|---|
-| `FLAVOR` | `development` \| `staging` \| `production` |
-| `FIREBASE_PROJECT_ID` | Firebase proje kimliği |
-| `FIREBASE_MESSAGING_SENDER_ID` | Platformlar arası ortak |
-| `FIREBASE_API_KEY_ANDROID` / `_IOS` / `_WEB` | Platform API anahtarı |
-| `FIREBASE_APP_ID_ANDROID` / `_IOS` / `_WEB` | Platform uygulama kimliği |
+| `SUPABASE_URL` | `https://<proje-ref>.supabase.co` |
+| `SUPABASE_ANON_KEY` | `publishable` (eski adıyla `anon`) anahtar |
+
+`anon` anahtarının istemciye gömülmesi **tasarım gereği güvenlidir**: kimin
+neyi görebileceğine RLS politikaları karar veriyor, anahtar değil. `secret`
+anahtar RLS'i tamamen atlar ve uygulamaya **asla** konmaz.
 
 ### Opsiyonel değerler
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `FIREBASE_STORAGE_BUCKET` | — | Storage kullanılacaksa zorunlu |
-| `FIREBASE_AUTH_DOMAIN` | — | Web girişi |
-| `FIREBASE_MEASUREMENT_ID` | — | Web analytics |
-| `FIREBASE_IOS_BUNDLE_ID` | `com.mudo.smartlist` | iOS bundle kimliği |
+| `FLAVOR` | `development` | `development` | `staging` | `production` |
 | `AI_PROXY_BASE_URL` | — | Sunucu tarafı AI proxy — **üretimde bunu kullanın** |
-| `AI_PROVIDER` | `claude` | `claude` \| `openai` \| `gemini` |
+| `AI_PROVIDER` | `claude` | `openrouter` | `claude` | `openai` | `gemini` |
+| `OPENROUTER_API_KEY` | — | Yalnızca yerel geliştirme |
+| `OPENROUTER_MODEL` | `openai/gpt-oss-20b:free` | OpenRouter model kimliği |
 | `ANTHROPIC_API_KEY` | — | Yalnızca yerel geliştirme |
 | `OPENAI_API_KEY` | — | Yalnızca yerel geliştirme |
 | `GEMINI_API_KEY` | — | Yalnızca yerel geliştirme |
-| `ENABLE_CRASHLYTICS` | development dışında açık | Çökme raporlama |
-| `ENABLE_ANALYTICS` | development dışında açık | Analytics |
-| `ENABLE_FIRESTORE_PERSISTENCE` | `true` | Çevrimdışı önbellek |
 | `VERBOSE_LOGGING` | production dışında açık | Log seviyesi |
 
 > 🔒 **Üretim derlemelerinde `AI_PROXY_BASE_URL` verin, sağlayıcı anahtarı
@@ -136,21 +129,24 @@ söyleyen bir ekranla** açılışta durur — sessiz çalışma zamanı hatası
 | Komut | Ne yapar |
 |---|---|
 | `.\scripts\setup.ps1` | Paketler + kod üretimi + analiz + test |
-| `.\scripts\run_preview.ps1` | **Arayüzü Firebase olmadan çalıştırır** (telefon/tarayıcı) |
-| `.\scripts\run_dev.ps1` | Gerçek uygulamayı çalıştırır (Firebase gerekir) |
+| `.\scripts\run_preview.ps1` | **Arayüzü sunucu olmadan çalıştırır** (telefon/tarayıcı) |
+| `.\scripts\run_dev.ps1` | Gerçek uygulamayı çalıştırır (Supabase gerekir) |
 | `flutter analyze` | Statik analiz (uyarı vermemeli) |
-| `flutter test` | 25 test |
+| `flutter test` | 101 test |
 | `dart run build_runner build` | Model değişikliğinden sonra |
 | `dart run build_runner watch` | Sürekli üretim (geliştirme) |
 | `flutter gen-l10n` | Metin (ARB) değişikliğinden sonra |
 | `dart format lib test` | Biçimlendirme |
 
-**Firebase:**
+**Supabase:**
 
 ```powershell
-firebase emulators:start --only firestore,storage,auth
-firebase deploy --only firestore:rules,firestore:indexes,storage
+.scriptssupabase_push.ps1            # migration'ları uygula (bağlantı dizgesi gerekir)
+.scriptssupabase_push.ps1 -Verify    # şemayı doğrula
 ```
+
+Bağlantı dizgesi olmadan: `supabase/schema_all.sql` dosyasını Dashboard'un
+**SQL Editor**'üne yapıştırıp çalıştırın.
 
 **Sürüm derlemesi:**
 
@@ -169,8 +165,8 @@ lib/
   main*.dart               flavor başına giriş noktası
   core/
     bootstrap.dart         başlatma, global hata yakalama, kalıcılık
-    config/                flavorlar, derleme yapılandırması, Firebase ayarları
-    constants/             Firestore yolları, sabitler, depolama anahtarları
+    config/                flavorlar, derleme yapılandırması, özellik bayrakları
+    constants/             sabitler, depolama anahtarları
     database/              Hive çevrimdışı önbellek
     errors/                hata taksonomisi ve tedarikçi hata eşleme
     theme/                 tasarım token'ları, ThemeData, boşluk uzantısı
@@ -183,13 +179,15 @@ lib/
   providers/               Riverpod altyapı provider'ları
 docs/                      kurulum, şema, durum dokümanları
 scripts/                   kurulum ve çalıştırma script'leri
+supabase/                  migration'lar, RLS politikaları, CLI yapılandırması
+tool/                      arka uç doğrulama betiği
 ```
 
 ---
 
 ## 🏗️ Mimari notlar
 
-**Hata yönetimi tek sınırda.** Repository'ler `FirebaseException`,
+**Hata yönetimi tek sınırda.** Repository'ler `PostgrestException`,
 `DioException` ve `PlatformException`'ı tek bir yerde
 ([`core/errors/error_mapper.dart`](lib/core/errors/error_mapper.dart)) sealed
 `AppException` hiyerarşisine çevirir. Sunum katmanı hiçbir tedarikçi hata kodunu
@@ -200,11 +198,16 @@ Tedarikçiler `AiProvider` arayüzünü uygular; `AiProviderRegistry` kullanıc�
 seçimini çözer ve anahtarı olmayan tedarikçiyi atlayarak sıradakine geçer. Yeni
 bir tedarikçi eklemek tek dosya yazmak demektir.
 
-**Firestore şeması tek okumada yetkilendirilir.** Üyelik liste dokümanına
-`memberIds` + `memberRoles` olarak denormalize edildi; böylece "üye olduğum
-listeler" tek `array-contains` sorgusu, güvenlik kuralları da alt koleksiyonları
-tek bir `get()` ile yetkilendiriyor. Roller alan bazında uygulanıyor: bir
-*viewer* bir üründe yalnızca tamamlanma ve satın alma alanlarını değiştirebilir.
+**Yetkilendirme RLS politikalarında.** Üyelik `list_members` tablosunda ve
+politikalar `security definer` yardımcı fonksiyonlarla rol çözüyor. Bu zorunlu:
+`shopping_lists` politikası `list_members`'a, `list_members` politikası
+`shopping_lists`'e bakarsa Postgres sonsuz özyinelemeye girer.
+
+**Viewer kısıtı trigger'da, politikada değil.** RLS hangi *satıra*
+dokunulabileceğine karar verir, hangi *sütunun değiştiğine* bakamaz; sütun bazlı
+`GRANT` de rol yerine listeye göre değişen bir kuralı ifade edemez. Bu yüzden
+`items` üstündeki bir `before update` trigger'ı, tamamlanma ve satın alma
+alanları dışında bir şey değiştiren *viewer* yazmasını reddediyor.
 
 **Tema token'lar üzerinden.** Her görsel değer `design_tokens.dart` veya
 `SpacingTheme` uzantısından gelir. Hiçbir widget renk, yarıçap, gölge veya
@@ -231,10 +234,10 @@ boşluk değeri gömmez.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) her push'ta çalışır:
 
 - **verify** — biçim kontrolü, üretilen kodun tazeliği, `flutter analyze`, testler
-- **rules** — Firestore kurallarını emülatörde doğrular
+- **schema** — migration söz dizimini Postgres ayrıştırıcısıyla doğrular
 - **android** / **ios** — `main` dalında imzalı AAB ve IPA üretir
 
-> `android` ve `ios` işleri imzalama sertifikalarını ve Firebase değerlerini
+> `android` ve `ios` işleri imzalama sertifikalarını ve Supabase değerlerini
 > **repository secret**'larından okur. Secret'lar tanımlanmadan bu iki iş
 > başarısız görünür; bu beklenen durumdur, kodda sorun olduğu anlamına gelmez.
 
