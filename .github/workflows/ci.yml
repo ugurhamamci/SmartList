@@ -57,8 +57,8 @@ jobs:
           name: coverage
           path: coverage/lcov.info
 
-  rules:
-    name: Firestore rules
+  schema:
+    name: Postgres schema
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,15 +67,31 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+      # Migration'lar bir veritabani olmadan da soz dizimi acisindan
+      # dogrulanabiliyor: pgsql-parser gercek Postgres ayristiricisini kullanir.
+      # PL/pgSQL govdeleri ayristiriciya metin gorundugu icin bu kontrol
+      # davranisi kanitlamaz; onu tool/verify_backend.mjs canli projede yapiyor.
+      - name: Install the Postgres parser
+        run: npm install --no-save pgsql-parser
 
-      - name: Validate rules against the emulator
+      - name: Parse every migration
         run: |
-          firebase emulators:exec \
-            --only firestore,storage \
-            --project smartlist-ci \
-            "echo 'Rules and indexes parsed successfully'"
+          node --input-type=module -e "
+          import { readdirSync, readFileSync } from 'node:fs';
+          import { parse } from 'pgsql-parser';
+          const dir = 'supabase/migrations';
+          let failed = 0;
+          for (const file of readdirSync(dir).filter(f => f.endsWith('.sql')).sort()) {
+            try {
+              await parse(readFileSync(dir + '/' + file, 'utf8'));
+              console.log('OK   ' + file);
+            } catch (error) {
+              failed++;
+              console.log('FAIL ' + file + ': ' + error.message);
+            }
+          }
+          process.exit(failed === 0 ? 0 : 1);
+          "
 
   android:
     name: Android release

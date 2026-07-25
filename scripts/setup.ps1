@@ -124,13 +124,13 @@ if ($analizSonuc -eq 0 -and $testSonuc -eq 0) {
 }
 
 Write-Host ''
-Write-Host 'ARAYUZU HEMEN GORMEK ICIN (Firebase gerekmez):' -ForegroundColor White
+Write-Host 'ARAYUZU HEMEN GORMEK ICIN (sunucu gerekmez):' -ForegroundColor White
 Write-Host '  .\scripts\run_preview.ps1              # bagli telefon veya emulator'
 Write-Host '  .\scripts\run_preview.ps1 -Device chrome   # tarayicida'
 Write-Host ''
-Write-Host 'GERCEK UYGULAMAYI CALISTIRMAK ICIN (Firebase gerekir):' -ForegroundColor White
+Write-Host 'GERCEK UYGULAMAYI CALISTIRMAK ICIN (Supabase gerekir):' -ForegroundColor White
 Write-Host '  1. Copy-Item scripts\defines.example.ps1 scripts\defines.local.ps1'
-Write-Host '  2. defines.local.ps1 icindeki Firebase degerlerini doldurun'
+Write-Host '  2. defines.local.ps1 icindeki SUPABASE_URL ve SUPABASE_ANON_KEY degerlerini doldurun'
 Write-Host '  3. .\scripts\run_dev.ps1'
 Write-Host ''
 Write-Host 'Ayrintili anlatim: docs\KURULUM.md'

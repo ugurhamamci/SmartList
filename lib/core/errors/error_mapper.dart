@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-// FirebaseException is re-exported by firebase_auth.
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
-
 import 'package:smartlist/core/errors/app_exception.dart';
+// Supabase'in `AuthException`'i uygulamanin kendi tipiyle ayni ada sahip.
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 
 /// Translates infrastructure errors into the [AppException] taxonomy.
 ///
@@ -19,8 +18,8 @@ abstract final class ErrorMapper {
       return error;
     }
     return switch (error) {
-      final FirebaseAuthException e => _auth(e, stackTrace),
-      final FirebaseException e => _firebase(e, stackTrace),
+      final PostgrestException e => _postgrest(e, stackTrace),
+      final StorageException e => _storage(e, stackTrace),
       final DioException e => _dio(e, stackTrace),
       final PlatformException e => _platform(e, stackTrace),
       final SocketException e => NetworkException(
@@ -63,115 +62,129 @@ abstract final class ErrorMapper {
     });
   }
 
-  static AppException _auth(
-    FirebaseAuthException e,
-    StackTrace? stackTrace,
-  ) {
-    final code = switch (e.code) {
-      'invalid-email' => 'auth.invalid_email',
-      'user-disabled' => 'auth.user_disabled',
-      'user-not-found' => 'auth.user_not_found',
-      'wrong-password' => 'auth.wrong_password',
-      'invalid-credential' => 'auth.invalid_credential',
-      'email-already-in-use' => 'auth.email_already_in_use',
-      'weak-password' => 'auth.weak_password',
-      'operation-not-allowed' => 'auth.operation_not_allowed',
-      'requires-recent-login' => 'auth.requires_recent_login',
-      'account-exists-with-different-credential' =>
-        'auth.account_exists_with_different_credential',
-      'credential-already-in-use' => 'auth.credential_already_in_use',
-      'invalid-verification-code' => 'auth.invalid_verification_code',
-      'expired-action-code' => 'auth.expired_action_code',
-      'invalid-action-code' => 'auth.invalid_action_code',
-      'unverified-email' => 'auth.unverified_email',
-      'sign_in_canceled' || 'canceled' => 'auth.cancelled',
-      'network-request-failed' => 'network.unavailable',
-      'too-many-requests' => 'quota.rate_limited',
-      _ => 'auth.failed',
-    };
-
-    if (code == 'network.unavailable') {
-      return NetworkException(
-        details: e.message,
-        cause: e,
-        stackTrace: stackTrace,
-      );
-    }
-    if (code == 'quota.rate_limited') {
-      return RateLimitException(
-        details: e.message,
-        cause: e,
-        stackTrace: stackTrace,
-      );
-    }
-    return AuthException(
-      code: code,
-      details: e.message,
-      cause: e,
-      stackTrace: stackTrace,
-    );
-  }
-
-  static AppException _firebase(
-    FirebaseException e,
+  /// PostgREST hatasini esler.
+  ///
+  /// `code` alani Postgres'in SQLSTATE degeri (5 karakter) ya da PostgREST'in
+  /// kendi `PGRSTxxx` kodu oluyor. Ayirt etmek onemli: RLS reddi ile bir kisit
+  /// ihlali kullaniciya farkli sey anlatmali.
+  static AppException _postgrest(
+    PostgrestException e,
     StackTrace? stackTrace,
   ) {
     return switch (e.code) {
-      'permission-denied' ||
-      'unauthorized' ||
-      'unauthenticated' => PermissionDeniedException(
+      // 42501 insufficient_privilege: RLS politikasi ya da viewer alan
+      // kisitlamasi trigger'i reddetti.
+      '42501' || 'PGRST301' => PermissionDeniedException(
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      'not-found' || 'object-not-found' => NotFoundException(
+
+      // PGRST116: tek satir beklenirken hicbiri donmedi.
+      // P0002: fonksiyon icinde `no_data_found` firlatildi (gecersiz davet).
+      'PGRST116' || 'P0002' => NotFoundException(
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      'already-exists' ||
-      'aborted' ||
-      'failed-precondition' => ConflictException(
+
+      // 23505 tekillik ihlali: ayni uyeyi iki kez eklemek, ayni barkodu ikinci
+      // kez kaydetmek gibi durumlar.
+      '23505' => ConflictException(
+        code: 'conflict.duplicate',
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      'unavailable' || 'internal' || 'data-loss' => ServerException(
-        details: e.message,
-        cause: e,
-        stackTrace: stackTrace,
-      ),
-      'deadline-exceeded' => NetworkException(
-        code: 'network.timeout',
-        details: e.message,
-        cause: e,
-        stackTrace: stackTrace,
-      ),
-      'resource-exhausted' || 'quota-exceeded' => RateLimitException(
-        details: e.message,
-        cause: e,
-        stackTrace: stackTrace,
-      ),
-      'invalid-argument' || 'out-of-range' => ValidationException(
+
+      // 23503 foreign key: silinmis bir listeye urun eklemek.
+      // 23514 check kisiti: negatif miktar, gecersiz renk kodu.
+      // 22P02 gecersiz metin gosterimi: bozuk uuid veya enum degeri.
+      '23503' || '23514' || '22P02' || '23502' => ValidationException(
         code: 'validation.invalid_argument',
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      'cancelled' => NetworkException(
-        code: 'network.cancelled',
+
+      // 40001 serialization_failure / 40P01 deadlock: eszamanli yazma
+      // cakismasi. Yeniden denemek makul, o yuzden Conflict.
+      '40001' || '40P01' => ConflictException(
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      'unimplemented' => UnknownException(
-        code: 'server.unimplemented',
+
+      // 57014 sorgu iptal edildi (zaman asimi).
+      '57014' => NetworkException(
+        code: 'network.timeout',
         details: e.message,
         cause: e,
         stackTrace: stackTrace,
       ),
-      _ => UnknownException(
-        details: '${e.plugin}/${e.code}: ${e.message}',
+
+      // 53300 too_many_connections: baglanti havuzu doldu.
+      '53300' || '53400' => RateLimitException(
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+
+      // PGRST202: cagirilan fonksiyon yok. PGRST205: tablo sema onbelleginde
+      // yok - sema uygulanmamis demek, gelistirme hatasi.
+      'PGRST202' || 'PGRST205' => UnknownException(
+        code: 'server.schema_mismatch',
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+
+      _ => ServerException(
+        details: '${e.code}: ${e.message}',
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+    };
+  }
+
+  /// Supabase Storage hatasini esler. Kodlar HTTP durumunu metin olarak
+  /// tasiyor.
+  static AppException _storage(
+    StorageException e,
+    StackTrace? stackTrace,
+  ) {
+    return switch (e.statusCode) {
+      '401' || '403' => PermissionDeniedException(
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+      '404' => NotFoundException(
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+      '409' => ConflictException(
+        code: 'conflict.duplicate',
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+      // Dosya boyutu sinirini asmak en sik gorulen hata; kullaniciya
+      // "gecersiz" degil "cok buyuk" demek gerekiyor.
+      '413' => ValidationException(
+        code: 'validation.file_too_large',
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+      '429' => RateLimitException(
+        details: e.message,
+        cause: e,
+        stackTrace: stackTrace,
+      ),
+      _ => ServerException(
+        details: '${e.statusCode}: ${e.message}',
         cause: e,
         stackTrace: stackTrace,
       ),

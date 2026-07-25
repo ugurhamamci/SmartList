@@ -1,7 +1,8 @@
 # SmartList — tasarim onizlemesini calistirir
 #
-# lib/main_preview.dart giris noktasini kullanir. Firebase'e HIC dokunmaz, bu
-# yuzden --dart-define vermeye ve Firebase projesi kurmaya gerek yoktur.
+# lib/main_preview.dart giris noktasini kullanir. Sunucuya (Supabase) HIC
+# dokunmaz, bu yuzden --dart-define vermeye ve proje kurmaya gerek yoktur.
+# Veri bellekte tutulur.
 # Telefonda arayuzu gormek icin en hizli yol budur.
 #
 # Kullanim:
@@ -10,7 +11,7 @@
 #   .\scripts\run_preview.ps1 -Web             # tarayici acmadan, adres verir
 #   .\scripts\run_preview.ps1 -Build apk       # kurulabilir APK uretir
 #
-# Gercek uygulama icin run_dev.ps1 kullanin; o Firebase degerlerini ister.
+# Gercek uygulama icin run_dev.ps1 kullanin; o Supabase degerlerini ister.
 
 #Requires -Version 5.1
 [CmdletBinding()]
@@ -62,7 +63,7 @@ if ($Build -ne 'run') {
     if ($Release) { $args += '--release' }
 }
 
-Write-Host 'Firebase yapilandirmasi gerekmiyor - onizleme giris noktasi kullaniliyor.' -ForegroundColor DarkGray
+Write-Host 'Sunucu yapilandirmasi gerekmiyor - onizleme giris noktasi kullaniliyor.' -ForegroundColor DarkGray
 Write-Host ''
 
 & flutter @args

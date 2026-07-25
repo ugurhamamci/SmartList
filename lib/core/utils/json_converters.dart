@@ -1,13 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:json_annotation/json_annotation.dart';
 
-/// Converts a Firestore `Timestamp` to a UTC [DateTime].
+/// Postgres `timestamptz` degerini UTC [DateTime]'a cevirir.
 ///
-/// A field written with `FieldValue.serverTimestamp()` reads back as `null`
-/// from the local cache until the server acknowledges the write. Because
-/// `createdAt` and `updatedAt` are non-nullable in the domain model, a pending
-/// value resolves to the current time so that optimistic UI keeps a sensible
-/// ordering; the authoritative server value replaces it on the next snapshot.
+/// PostgREST zaman damgalarini ISO-8601 metin olarak dondurur. Alan zorunlu
+/// oldugu icin cozulemeyen bir deger simdiki zamana dusuyor: iyimser arayuz
+/// siralamasi bozulmasin, sunucudan gelen dogru deger sonraki okumada yerine
+/// gecsin.
 class TimestampConverter implements JsonConverter<DateTime, Object?> {
   const TimestampConverter();
 
@@ -16,10 +14,11 @@ class TimestampConverter implements JsonConverter<DateTime, Object?> {
     return _parse(json) ?? DateTime.now().toUtc();
   }
 
-  /// Serialisation emits a [Timestamp]; repositories substitute
-  /// `FieldValue.serverTimestamp()` for audit fields before writing.
+  /// ISO-8601 (UTC) olarak yazilir. Denetim alanlarini (`created_at`,
+  /// `updated_at`) istemci hic gondermiyor; onlari veritabani trigger'i
+  /// damgaliyor, boylece cihaz saati yanlis olsa bile kayit dogru kalir.
   @override
-  Object toJson(DateTime object) => Timestamp.fromDate(object);
+  Object toJson(DateTime object) => object.toUtc().toIso8601String();
 }
 
 /// Nullable counterpart of [TimestampConverter]; preserves `null`.
@@ -30,30 +29,28 @@ class NullableTimestampConverter implements JsonConverter<DateTime?, Object?> {
   DateTime? fromJson(Object? json) => _parse(json);
 
   @override
-  Object? toJson(DateTime? object) =>
-      object == null ? null : Timestamp.fromDate(object);
+  Object? toJson(DateTime? object) => object?.toUtc().toIso8601String();
 }
 
-/// Accepts every wire representation a timestamp can arrive in: a Firestore
-/// [Timestamp] from a snapshot, an ISO-8601 string or epoch milliseconds from
-/// the Hive cache, or a [DateTime] from an in-memory fixture.
+/// Bir zaman damgasinin gelebilecegi her bicimi kabul eder: PostgREST'ten
+/// ISO-8601 metin, Hive onbelleginden epoch milisaniye, bellekteki bir
+/// ornekten dogrudan [DateTime].
 DateTime? _parse(Object? json) {
   return switch (json) {
     null => null,
-    final Timestamp value => value.toDate().toUtc(),
     final DateTime value => value.toUtc(),
     final int value => DateTime.fromMillisecondsSinceEpoch(
       value,
       isUtc: true,
     ).toUtc(),
     final String value => DateTime.tryParse(value)?.toUtc(),
-    // A pending server timestamp surfaces as a FieldValue sentinel.
     _ => null,
   };
 }
 
-/// Converts a `uid -> Timestamp` map, the shape used for read receipts and
-/// per-member "last opened" markers.
+/// `uid -> zaman damgasi` haritasini cevirir; okundu bilgisi ve uye basina
+/// "en son ne zaman acti" isaretleri bu bicimde tutuluyor. Veritabaninda
+/// `jsonb` sutunu.
 ///
 /// A map keyed by uid is preferred over a parallel array because each writer
 /// only ever touches their own key, so concurrent updates merge instead of
@@ -80,7 +77,7 @@ class TimestampMapConverter
 
   @override
   Object toJson(Map<String, DateTime> object) => object.map(
-    (key, value) => MapEntry(key, Timestamp.fromDate(value)),
+    (key, value) => MapEntry(key, value.toUtc().toIso8601String()),
   );
 }
 
@@ -107,8 +104,8 @@ class NullableDurationConverter implements JsonConverter<Duration?, int?> {
   int? toJson(Duration? object) => object?.inMilliseconds;
 }
 
-/// Tolerates integers arriving as doubles, which Firestore does for values
-/// that were written as `1.0` and for aggregation results.
+/// Tam sayinin ondalik olarak gelmesini tolere eder. PostgREST `numeric`
+/// sutunlarini bazen `1.0` bicimde, bazen metin olarak dondurur.
 class FlexibleIntConverter implements JsonConverter<int, Object?> {
   const FlexibleIntConverter();
 
@@ -124,8 +121,8 @@ class FlexibleIntConverter implements JsonConverter<int, Object?> {
   Object toJson(int object) => object;
 }
 
-/// Tolerates doubles arriving as integers, which Firestore does for whole
-/// numbers such as a price of `12`.
+/// Ondalik sayinin tam sayi olarak gelmesini tolere eder: `numeric(12,2)`
+/// sutunundaki `12` degeri JSON'da `12` olarak geliyor.
 class FlexibleDoubleConverter implements JsonConverter<double, Object?> {
   const FlexibleDoubleConverter();
 
