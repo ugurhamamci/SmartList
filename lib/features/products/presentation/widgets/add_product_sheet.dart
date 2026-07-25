@@ -5,6 +5,24 @@ import 'package:smartlist/core/theme/design_tokens.dart';
 import 'package:smartlist/core/theme/spacing_theme.dart';
 import 'package:smartlist/core/widgets/press_scale.dart';
 
+/// Barkod taramasından dönen ürün bilgisi.
+///
+/// Barkod özelliğinin veri katmanına bağımlılık kurmamak için sade bir taşıyıcı
+/// kullanılıyor; alt sayfa hangi servisin çözdüğünü bilmez.
+class ScannedProduct {
+  const ScannedProduct({
+    required this.name,
+    this.quantity = '',
+    this.barcode = '',
+  });
+
+  final String name;
+
+  /// "400 g" gibi ambalaj miktarı; not alanına yazılır.
+  final String quantity;
+  final String barcode;
+}
+
 /// Kullanıcının doldurduğu ürün formunun sonucu.
 class NewProduct {
   const NewProduct({
@@ -32,7 +50,11 @@ class NewProduct {
 ///
 /// [show] ile açılır ve girilen ürünü döndürür; iptal edilirse `null`.
 class AddProductSheet extends StatefulWidget {
-  const AddProductSheet({this.categories = _defaultCategories, super.key});
+  const AddProductSheet({
+    this.categories = _defaultCategories,
+    this.onScanBarcode,
+    super.key,
+  });
 
   static const List<String> _defaultCategories = [
     'Market',
@@ -45,14 +67,21 @@ class AddProductSheet extends StatefulWidget {
 
   final List<String> categories;
 
+  /// Barkod tarayıcıyı açıp çözülen ürünü döndürür. Sağlanmazsa barkod
+  /// düğmesi taramanın henüz bağlı olmadığını bildirir.
+  final Future<ScannedProduct?> Function()? onScanBarcode;
+
   /// Alt sayfayı açar. Tasarımın eğrisiyle ve 32px köşeyle gelir.
-  static Future<NewProduct?> show(BuildContext context) {
+  static Future<NewProduct?> show(
+    BuildContext context, {
+    Future<ScannedProduct?> Function()? onScanBarcode,
+  }) {
     return showModalBottomSheet<NewProduct>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       barrierColor: DesignTokens.scrimColor,
-      builder: (_) => const AddProductSheet(),
+      builder: (_) => AddProductSheet(onScanBarcode: onScanBarcode),
     );
   }
 
@@ -99,10 +128,37 @@ class _AddProductSheetState extends State<AddProductSheet> {
   }
 
   void _quickCapture(String label) {
-    // Kamera, barkod ve ses servisleri henüz bağlı değil; kullanıcıya sessiz
-    // kalmak yerine durumu bildiriyoruz.
+    // Kamera ve ses servisleri henüz bağlı değil; kullanıcıya sessiz kalmak
+    // yerine durumu bildiriyoruz.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$label yakında eklenecek')),
+    );
+  }
+
+  /// Barkod tarar ve çözülen ürünü forma doldurur.
+  Future<void> _scan() async {
+    final handler = widget.onScanBarcode;
+    if (handler == null) {
+      _quickCapture('Barkod okuma');
+      return;
+    }
+
+    final product = await handler();
+    if (product == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _nameController.text = product.name;
+      // Ambalaj miktarı ("400 g") uygulamadaki miktar/birim ikilisine birebir
+      // oturmadığı için nota yazılıyor; kullanıcı isterse düzeltir.
+      if (product.quantity.isNotEmpty && _noteController.text.trim().isEmpty) {
+        _noteController.text = product.quantity;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${product.name} bulundu')),
     );
   }
 
@@ -166,7 +222,7 @@ class _AddProductSheetState extends State<AddProductSheet> {
                         _QuickCapture(
                           icon: Icons.qr_code_scanner,
                           label: 'Barkod',
-                          onTap: () => _quickCapture('Barkod okuma'),
+                          onTap: _scan,
                         ),
                         SizedBox(width: spacing.gutter),
                         _QuickCapture(

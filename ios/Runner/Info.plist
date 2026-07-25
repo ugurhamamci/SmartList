@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Smartlist</string>
+	<string>SmartList</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,6 +26,28 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- iOS izin metinleri. Bu anahtarlar olmadan izin isteyen çağrı
+	     uygulamayı çökertir; App Store incelemesi de reddeder. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Ürün barkodlarını ve liste davet QR kodlarını okumak için kameraya erişmemiz gerekiyor.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ürünleri sesle eklemek için mikrofona erişmemiz gerekiyor.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Söylediğiniz ürünleri listeye yazabilmek için konuşmanızı metne çeviriyoruz.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Profil fotoğrafı ve ürün görseli seçebilmek için fotoğraflarınıza erişmemiz gerekiyor.</string>
+	<!-- Davet bağlantısı: smartlist://join/<kod> -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.smartlist.invite</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>smartlist</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

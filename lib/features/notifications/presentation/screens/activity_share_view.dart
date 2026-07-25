@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:smartlist/core/theme/design_tokens.dart';
 import 'package:smartlist/core/theme/spacing_theme.dart';
@@ -328,6 +329,11 @@ class _SharePanel extends StatelessWidget {
   final VoidCallback? onShareWhatsApp;
   final VoidCallback? onShareSms;
 
+  /// QR koduna gömülen tam adres. [inviteLink] ekranda kısaltılmış hâlde
+  /// gösterilirken, kodun içine taranabilir tam URL yazılır.
+  String get inviteUrl =>
+      inviteLink.startsWith('http') ? inviteLink : 'https://$inviteLink';
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -353,19 +359,35 @@ class _SharePanel extends StatelessWidget {
                         Container(
                           width: DesignTokens.qrSize,
                           height: DesignTokens.qrSize,
+                          padding: const EdgeInsets.all(DesignTokens.space4),
                           decoration: BoxDecoration(
                             color: scheme.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(
                               DesignTokens.radius2xl,
                             ),
                           ),
-                          child: Center(
-                            // Gerçek QR, paylaşım bağlantısı üretildiğinde
-                            // çizilecek; şimdilik marka ikonu duruyor.
-                            child: Icon(
-                              Icons.qr_code_2,
-                              size: 160,
+                          // Gerçek, okunabilir QR kodu. İçeriği davet
+                          // bağlantısıdır; tarayıcı bunu okuyup listeye
+                          // katılma akışını başlatır.
+                          child: QrImageView(
+                            data: inviteUrl,
+                            backgroundColor: scheme.surfaceContainerLow,
+                            eyeStyle: QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
                               color: scheme.onSurface,
+                            ),
+                            dataModuleStyle: QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: scheme.onSurface,
+                            ),
+                            // Kod çizilemezse kullanıcı bağlantıyı
+                            // kopyalayarak devam edebilir.
+                            errorStateBuilder: (_, _) => Center(
+                              child: Text(
+                                'QR oluşturulamadı.\nBağlantıyı kopyalayın.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall,
+                              ),
                             ),
                           ),
                         ),
