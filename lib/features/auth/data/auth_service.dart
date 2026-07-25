@@ -91,6 +91,42 @@ class AuthService {
     );
   }
 
+  /// Google ile giriş.
+  ///
+  /// Akış Supabase'in barındırdığı OAuth uç noktasından geçiyor: uygulama
+  /// sistem tarayıcısını açıyor, kullanıcı Google'da onaylıyor, Supabase
+  /// oturumu `smartlist://login-callback` derin bağlantısıyla uygulamaya
+  /// geri veriyor.
+  ///
+  /// Yerel (native) hesap seçicisi yerine tarayıcı akışının seçilmesi bilinçli:
+  /// yerel akış her platform için ayrı OAuth istemci kimliği, Android'de imza
+  /// parmak izi ve ek paketler gerektiriyor. Tarayıcı akışı tek bir Dashboard
+  /// yapılandırmasıyla iki platformda da çalışıyor. Yerel seçiciye geçmek
+  /// istenirse yalnızca bu metodun gövdesi değişir, çağrı yerleri değişmez.
+  ///
+  /// Dönen `true` yalnızca tarayıcının açıldığını söyler; oturumun gerçekten
+  /// açıldığını [authStateChanges] bildiriyor.
+  Future<bool> signInWithGoogle() => _signInWithProvider(OAuthProvider.google);
+
+  /// Apple ile giriş.
+  ///
+  /// App Store kuralı gereği başka bir üçüncü taraf girişi sunan uygulamanın
+  /// Apple ile girişi de sunması gerekiyor; bu yüzden Google'la birlikte
+  /// zorunlu bir eş.
+  Future<bool> signInWithApple() => _signInWithProvider(OAuthProvider.apple);
+
+  Future<bool> _signInWithProvider(OAuthProvider provider) {
+    return _guard(
+      () => _auth.signInWithOAuth(
+        provider,
+        redirectTo: 'smartlist://login-callback',
+        // Uygulama içi tarayıcı sekmesi: kullanıcı uygulamadan çıkmış gibi
+        // hissetmiyor ve dönüş derin bağlantısı daha güvenilir çalışıyor.
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      ),
+    );
+  }
+
   Future<void> signOut() => _guard(_auth.signOut);
 
   /// Supabase istisnalarını [AppException] ailesine çevirir.
