@@ -62,8 +62,10 @@ durumdadır — o sekmede `Ctrl+S` yapmanız yeterli olabilir.
 - Flutter SDK **3.44.8** (Dart 3.12.2) indirildi ve `C:\src\flutter` altına
   kuruldu; kullanıcı `PATH`'ine kalıcı olarak eklendi.
 - `flutter doctor` ile doğrulandı.
-- Proje `flutter create` ile iskeletlendi (paket adı `smartlist`, organizasyon
-  `com.mudo`).
+- Proje `flutter create` ile iskeletlendi (paket adı `smartlist`). Uygulama
+  kimliği sonradan `com.fuurstudio.smartlist` olarak değiştirildi: uygulama
+  FuurStudio altında yayınlanacak ve bu değer Play Store'a ilk yüklemeden sonra
+  bir daha değiştirilemiyor.
 
 Kurulum sırasında iki gerçek bağımlılık çakışması çıktı ve çözüldü:
 

@@ -346,7 +346,7 @@ olduğunu söyleyen bir hata ekranı gösterir.
 ### 8.2 Android uygulaması ekleme
 
 1. Proje ana sayfasında **Android** ikonuna tıklayın.
-2. **Android paket adı:** `com.mudo.smartlist`
+2. **Android paket adı:** `com.fuurstudio.smartlist`
    > Bu değer tam olarak böyle olmalı, aksi halde Firebase uygulamayı tanımaz.
 3. **Uygulamayı kaydet**.
 4. `google-services.json` indirmenizi ister — **indirmenize gerek yok.** Bu
@@ -669,7 +669,7 @@ cd ios && pod install && cd ..
 ```
 
 Firebase Console'da bir **iOS uygulaması** ekleyin (bundle id:
-`com.mudo.smartlist`), `FIREBASE_API_KEY_IOS` ve `FIREBASE_APP_ID_IOS`
+`com.fuurstudio.smartlist`), `FIREBASE_API_KEY_IOS` ve `FIREBASE_APP_ID_IOS`
 değerlerini `defines.local.ps1` karşılığınıza ekleyin.
 
 Mac'te PowerShell yoksa komutu elle yazın:
