@@ -7,11 +7,15 @@ class VoiceItem {
     required this.quantity,
     required this.unit,
     required this.sourcePhrase,
+    this.price,
   });
 
   final String name;
   final double quantity;
   final MeasurementUnit unit;
+
+  /// Söylenmişse fiyat. "süt kırk beş lira" → 45.
+  final double? price;
 
   /// Bu ürünün türetildiği cümle parçası. Kullanıcı sonucu düzeltmek isterse
   /// neyin nereden geldiğini gösterebilmek için tutuluyor.
@@ -92,6 +96,18 @@ class VoiceParser {
 
   /// Ürünleri birbirinden ayıran sözcükler.
   static const Set<String> _separators = {'ve', 'ayrıca', 'birde', 'artı'};
+
+  /// Fiyat işareti sayılan sözcükler. Bunlardan biri geçtiğinde ondan ÖNCEKİ
+  /// sayı miktar değil fiyat sayılıyor: "iki litre süt kırk beş lira" cümlesinde
+  /// 2 miktar, 45 fiyattır.
+  static const Set<String> _currencyWords = {
+    'lira',
+    'tl',
+    'türklirası',
+    'liraya',
+    'liradan',
+    'kuruş',
+  };
 
   /// Ondalık ayırıcıyı cümle ayırıcısından korumak için kullanılan geçici
   /// işaret. Konuşma metninde geçemeyecek bir denetim karakteri seçildi.
@@ -187,8 +203,15 @@ class VoiceParser {
     final words = chunk.split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
 
     double? amount;
+    double? price;
     MeasurementUnit? unit;
     final nameWords = <String>[];
+
+    // Okunan sayı hemen miktara yazılmıyor: "kırk beş lira" cümlesinde 45
+    // fiyattır, miktar değil ve bunu ancak "lira" sözcüğünü görünce
+    // anlıyoruz. Sayı burada bekliyor, kararı birim ya da para birimi
+    // sözcüğü veriyor.
+    double? pending;
 
     for (final word in words) {
       final cleaned = word.replaceAll(RegExp("[^0-9a-zçğıöşü',.]"), '');
@@ -196,42 +219,52 @@ class VoiceParser {
         continue;
       }
 
-      // 1) Rakam mı? ("2", "1,5", "1.5")
-      final numeric = double.tryParse(cleaned.replaceAll(',', '.'));
-      if (numeric != null) {
-        // "iki buçuk" gibi durumda ikinci sayı ilkine eklenir.
-        amount = amount == null ? numeric : amount + numeric;
+      // 1) Para birimi: bekleyen sayı fiyattır.
+      if (_currencyWords.contains(cleaned)) {
+        price ??= pending;
+        pending = null;
         continue;
       }
 
-      // 2) Sayı sözcüğü mü? ("iki", "yarım", "buçuk")
+      // 2) Rakam ("2", "1,5") — bekleyene ekleniyor.
+      final numeric = double.tryParse(cleaned.replaceAll(',', '.'));
+      if (numeric != null) {
+        pending = (pending ?? 0) + numeric;
+        continue;
+      }
+
+      // 3) Sayı sözcüğü ("iki", "kırk", "buçuk"). Ardışık sözcükler toplanıyor:
+      // "kırk beş" → 45, "iki buçuk" → 2.5.
       final asWord = _numberWords[cleaned];
       if (asWord != null) {
-        // "buçuk" tek başına 0.5 değil, önceki sayıya eklenen yarımdır:
-        // "iki buçuk kilo" → 2.5.
-        amount = amount == null ? asWord : amount + asWord;
-        // "düzine" hem sayı hem birim; birim olarak da işaretliyoruz.
+        pending = (pending ?? 0) + asWord;
+        // "düzine" hem sayı hem birim.
         if (cleaned == 'düzine') {
           unit ??= MeasurementUnit.dozen;
         }
         continue;
       }
 
-      // 3) Birim mi? ("kilo", "litre", "paket")
+      // 4) Birim: bekleyen sayı miktardır.
       final asUnit = _unitWords[cleaned];
       if (asUnit != null) {
         unit ??= asUnit;
+        amount ??= pending;
+        pending = null;
         continue;
       }
 
-      // 4) Dolgu sözcüğü mü? ("al", "listeye", "lütfen")
+      // 5) Dolgu sözcüğü.
       if (_fillerWords.contains(cleaned)) {
         continue;
       }
 
-      // 5) Geri kalanı ürün adı.
+      // 6) Geri kalanı ürün adı.
       nameWords.add(cleaned);
     }
+
+    // Cümle bitti ve sayı hâlâ bekliyorsa miktar sayılıyor: "3 elma".
+    amount ??= pending;
 
     if (nameWords.isEmpty) {
       return null;
@@ -249,6 +282,7 @@ class VoiceParser {
 
     return VoiceItem(
       name: _capitalise(name),
+      price: price,
       // Miktar söylenmediyse 1 adet varsayılıyor; kullanıcı listede
       // değiştirebiliyor.
       quantity: amount ?? 1,

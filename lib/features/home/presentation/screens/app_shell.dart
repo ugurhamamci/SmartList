@@ -24,6 +24,7 @@ import 'package:smartlist/features/shopping_lists/data/lists_repository.dart';
 import 'package:smartlist/features/shopping_lists/list_providers.dart';
 import 'package:smartlist/features/shopping_lists/presentation/screens/list_detail_view.dart';
 import 'package:smartlist/features/shopping_lists/presentation/widgets/create_list_sheet.dart';
+import 'package:smartlist/features/shopping_lists/presentation/widgets/edit_item_sheet.dart';
 import 'package:smartlist/features/shopping_lists/presentation/widgets/shopping_item_tile.dart';
 import 'package:smartlist/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:smartlist/features/subscription/presentation/widgets/premium_sheet.dart';
@@ -398,33 +399,59 @@ class _AppShellState extends ConsumerState<AppShell> {
                 for (final list in rows)
                   Padding(
                     padding: EdgeInsets.only(bottom: spacing.stackGap),
-                    child: ListTile(
-                      onTap: () => _openList(list.id),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          DesignTokens.radius2xl,
+                    // Sağa kaydırma düzenler, sola kaydırma siler. İkisi de
+                    // `confirmDismiss` üzerinden geçip `false` dönüyor: satırı
+                    // kaydırma kaldırmıyor, listeyi sunucudan gelen yeni veri
+                    // tazeliyor. Aksi hâlde silme iptal edilse bile satır
+                    // ekrandan kaybolurdu.
+                    child: Dismissible(
+                      key: ValueKey(list.id),
+                      background: _SwipeAction(
+                        alignment: Alignment.centerLeft,
+                        icon: Icons.edit,
+                        label: 'Düzenle',
+                        color: theme.colorScheme.primaryContainer,
+                        textColor: theme.colorScheme.onPrimaryContainer,
+                      ),
+                      secondaryBackground: _SwipeAction(
+                        alignment: Alignment.centerRight,
+                        icon: Icons.delete_outline,
+                        label: 'Sil',
+                        color: theme.colorScheme.errorContainer,
+                        textColor: theme.colorScheme.onErrorContainer,
+                      ),
+                      confirmDismiss: (direction) =>
+                          direction == DismissDirection.startToEnd
+                          ? _renameList(list)
+                          : _confirmDeleteList(list),
+                      child: ListTile(
+                        onTap: () => _openList(list.id),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            DesignTokens.radius2xl,
+                          ),
+                          side: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
                         ),
-                        side: BorderSide(
-                          color: theme.colorScheme.outlineVariant,
+                        tileColor: theme.colorScheme.surfaceContainerLowest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: DesignTokens.space5,
+                          vertical: DesignTokens.space2,
                         ),
-                      ),
-                      tileColor: theme.colorScheme.surfaceContainerLowest,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: DesignTokens.space5,
-                        vertical: DesignTokens.space2,
-                      ),
-                      leading: Text(
-                        list.emoji,
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                      title: Text(
-                        list.title,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      subtitle: Text(_subtitleFor(list)),
-                      trailing: Icon(
-                        Icons.chevron_right,
-                        color: theme.colorScheme.onSurfaceVariant,
+                        leading: Text(
+                          list.emoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                        title: Text(
+                          list.title,
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        subtitle: Text(_subtitleFor(list)),
+                        trailing: Icon(
+                          Icons.chevron_right,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
@@ -433,6 +460,68 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ),
     );
+  }
+
+  /// Liste adını ve emojisini düzenler.
+  ///
+  /// `false` dönüyor: kaydırma yalnızca eylemi açtı, satır listede kalmalı.
+  Future<bool> _renameList(ListSummary list) async {
+    final edited = await RenameListSheet.show(
+      context,
+      title: list.title,
+      emoji: list.emoji,
+    );
+    if (edited == null) {
+      return false;
+    }
+
+    await _run(
+      () => _repository.updateList(
+        listId: list.id,
+        title: edited.title,
+        emoji: edited.emoji,
+      ),
+    );
+    return false;
+  }
+
+  /// Silme onayı ister.
+  ///
+  /// Liste paylaşılmışsa bunu söylüyor: kullanıcı kendi kopyasını değil,
+  /// herkesin gördüğü listeyi siliyor ve bunu bilerek yapması gerekiyor.
+  Future<bool> _confirmDeleteList(ListSummary list) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${list.title} silinsin mi?'),
+        content: Text(
+          list.memberCount > 1
+              ? 'Bu liste ${list.memberCount} kişiyle paylaşılıyor; '
+                    'hepsinden kaldırılacak.'
+              : '${list.itemCount} ürün listeyle birlikte kaldırılacak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (!(confirmed ?? false)) {
+      return false;
+    }
+
+    await _run(() => _repository.deleteList(list.id));
+    if (mounted) {
+      _snack('${list.title} silindi');
+    }
+    return false;
   }
 
   Widget _activity({bool shareTab = false}) {
@@ -659,6 +748,31 @@ class _ListDetailPage extends ConsumerWidget {
           ),
           onDeleteItem: (id) => run(() => repository.deleteItem(id)),
           onClearCompleted: () => run(() => repository.clearCompleted(listId)),
+          onEditItem: (id) async {
+            final item = rows.firstWhere((row) => row.id == id);
+            final edited = await EditItemSheet.show(
+              context,
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              notes: item.notes,
+              price: item.price,
+            );
+            if (edited == null) {
+              return;
+            }
+            await run(
+              () => repository.updateItem(
+                itemId: id,
+                name: edited.name,
+                quantity: edited.quantity,
+                unit: edited.unit,
+                price: edited.price,
+                clearPrice: edited.clearPrice,
+                notes: edited.notes,
+              ),
+            );
+          },
         ),
       ),
       // İki eylem: konuşarak hızlı ekleme ve elle ayrıntılı ekleme. Mikrofon
@@ -905,4 +1019,46 @@ Future<ScannedProduct?> _scanAndLookupProduct(
     barcode: info.barcode,
     quantity: info.quantity,
   );
+}
+
+/// Kaydırma sırasında satırın arkasında görünen eylem şeridi.
+class _SwipeAction extends StatelessWidget {
+  const _SwipeAction({
+    required this.alignment,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.textColor,
+  });
+
+  final Alignment alignment;
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: DesignTokens.space5),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(DesignTokens.radius2xl),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: textColor),
+          const SizedBox(width: DesignTokens.space2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

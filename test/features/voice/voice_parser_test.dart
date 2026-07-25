@@ -165,6 +165,52 @@ void main() {
     });
   });
 
+  group('fiyat', () {
+    test('para birimi sözcüğünden önceki sayı fiyat olur', () {
+      final items = parser.parse('süt kırk beş lira');
+
+      expect(items.single.name, 'Süt');
+      expect(items.single.price, 45);
+      // Sayı fiyata gittiği için miktar 1'de kalmalı.
+      expect(items.single.quantity, 1);
+    });
+
+    test('miktar ve fiyat birlikte çözülür', () {
+      final items = parser.parse('iki litre süt kırk beş lira');
+
+      expect(items.single.quantity, 2);
+      expect(items.single.unit, MeasurementUnit.liter);
+      expect(items.single.price, 45);
+    });
+
+    test('rakamla yazılmış fiyat çözülür', () {
+      final items = parser.parse('ekmek 20 TL');
+
+      expect(items.single.name, 'Ekmek');
+      expect(items.single.price, 20);
+    });
+
+    test('fiyat söylenmezse null kalır', () {
+      expect(parser.parse('2 litre süt').single.price, isNull);
+    });
+
+    test('birim gelen sayı fiyat sayılmaz', () {
+      // "3 kg" sonrası fiyat sözcüğü yok; 3 miktar olarak kalmalı.
+      final items = parser.parse('3 kg elma');
+
+      expect(items.single.quantity, 3);
+      expect(items.single.price, isNull);
+    });
+
+    test('her ürün kendi fiyatını korur', () {
+      final items = parser.parse('süt 45 lira ve ekmek 20 lira');
+
+      expect(items, hasLength(2));
+      expect(items[0].price, 45);
+      expect(items[1].price, 20);
+    });
+  });
+
   group('quantityLabel', () {
     test('tam sayı ondalık göstermez', () {
       expect(parser.parse('2 litre süt').single.quantityLabel, '2 l');

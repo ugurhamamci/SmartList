@@ -431,6 +431,130 @@ class ListsRepository {
     );
   }
 
+  /// Ürünü günceller.
+  ///
+  /// Yalnızca verilen alanlar gönderiliyor: bir alanı `null` yapmak ile
+  /// dokunmamak farklı şeyler, ve `price` gerçekten temizlenebilmeli.
+  /// Bu yüzden fiyat için ayrı bir `clearPrice` bayrağı var.
+  Future<void> updateItem({
+    required String itemId,
+    String? name,
+    double? quantity,
+    String? unit,
+    double? price,
+    bool clearPrice = false,
+    String? notes,
+  }) {
+    return ErrorMapper.guard(() async {
+      final patch = <String, dynamic>{
+        'name': ?name?.trim(),
+        'quantity': ?quantity,
+        'unit': ?unit,
+        // `clearPrice` fiyatı gerçekten siliyor; `price: null` göndermek ile
+        // alana hiç dokunmamak farklı şeyler.
+        if (clearPrice) 'price': null else 'price': ?price,
+        'notes': ?notes?.trim(),
+      };
+      if (patch.isEmpty) {
+        return;
+      }
+      await _client.from('items').update(patch).eq('id', itemId);
+    });
+  }
+
+  /// Listenin adını ve görselini günceller.
+  Future<void> updateList({
+    required String listId,
+    String? title,
+    String? emoji,
+    String? colorHex,
+  }) {
+    return ErrorMapper.guard(() async {
+      final patch = <String, dynamic>{
+        'title': ?title?.trim(),
+        'emoji': ?emoji,
+        'color_hex': ?colorHex,
+      };
+      if (patch.isEmpty) {
+        return;
+      }
+      await _client.from('shopping_lists').update(patch).eq('id', listId);
+    });
+  }
+
+  // ------------------------------------------------------------------ profil
+
+  /// Oturumdaki kullanıcının profilini okur.
+  Future<({String displayName, String email, String? photoUrl})>
+  fetchProfile() {
+    return ErrorMapper.guard(() async {
+      final row = await _client
+          .from('users')
+          .select('display_name,email,photo_url')
+          .eq('id', _uid)
+          .single();
+      return (
+        displayName: (row['display_name'] as String?) ?? '',
+        email: (row['email'] as String?) ?? '',
+        photoUrl: row['photo_url'] as String?,
+      );
+    });
+  }
+
+  /// Görünen adı günceller.
+  ///
+  /// İki yere yazılıyor: profil tablosu ve auth üst verisi. İkincisi olmadan
+  /// uygulama yeniden açıldığında eski ad görünür, çünkü oturum bilgisi
+  /// jetondan okunuyor.
+  ///
+  /// Üye listelerindeki kopyalar da tazeleniyor — ad, üye satırında
+  /// çoğaltılmış durumda ve orada güncellenmezse listeyi paylaştığı kişiler
+  /// eski adı görürdü.
+  Future<void> updateDisplayName(String displayName) {
+    return ErrorMapper.guard(() async {
+      final trimmed = displayName.trim();
+
+      await _client
+          .from('users')
+          .update({'display_name': trimmed})
+          .eq('id', _uid);
+
+      await _client.auth.updateUser(
+        UserAttributes(data: {'display_name': trimmed}),
+      );
+
+      await _client
+          .from('list_members')
+          .update({'display_name': trimmed})
+          .eq('user_id', _uid);
+    });
+  }
+
+  // ----------------------------------------------------------------- ayarlar
+
+  /// Kullanıcının ayarları. Satır kayıt sırasında trigger tarafından açılıyor,
+  /// bu yüzden burada oluşturmaya gerek yok.
+  Future<Map<String, dynamic>> fetchSettings() {
+    return ErrorMapper.guard(() async {
+      final row = await _client
+          .from('user_settings')
+          .select()
+          .eq('user_id', _uid)
+          .maybeSingle();
+      return row ?? const <String, dynamic>{};
+    });
+  }
+
+  /// Ayarları günceller. Yalnızca değişen alanlar gönderiliyor.
+  Future<void> updateSettings(Map<String, dynamic> patch) {
+    return ErrorMapper.guard(() async {
+      if (patch.isEmpty) {
+        return;
+      }
+      await _client.from('user_settings').update(patch).eq('user_id', _uid);
+    });
+  }
+
   // ---------------------------------------------------------------- paylaşım
 
   /// Listeye davet bağlantısı üretir ve kodunu döndürür.

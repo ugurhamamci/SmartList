@@ -21,6 +21,7 @@ class ListDetailView extends StatelessWidget {
     this.onMore,
     this.onToggleItem,
     this.onDeleteItem,
+    this.onEditItem,
     this.onClearCompleted,
     super.key,
   });
@@ -37,6 +38,10 @@ class ListDetailView extends StatelessWidget {
   final void Function({required String id, required bool completed})?
   onToggleItem;
   final ValueChanged<String>? onDeleteItem;
+
+  /// Ürüne dokunulduğunda düzenleme akışı. Tamamlanma kutusu ayrı çalışıyor;
+  /// satırın geri kalanına dokunmak düzenleme demek.
+  final ValueChanged<String>? onEditItem;
   final VoidCallback? onClearCompleted;
 
   @override
@@ -140,6 +145,9 @@ class ListDetailView extends StatelessWidget {
                       onToggle: (value) =>
                           onToggleItem?.call(id: item.id, completed: value),
                       onDelete: () => onDeleteItem?.call(item.id),
+                      onTap: onEditItem == null
+                          ? null
+                          : () => onEditItem!(item.id),
                     )
                     // Sırayla belirme: her öğe 60ms gecikmeli.
                     .animate(delay: (index * 60).ms)
@@ -195,6 +203,7 @@ class ListDetailView extends StatelessWidget {
                   onToggle: (value) =>
                       onToggleItem?.call(id: item.id, completed: value),
                   onDelete: () => onDeleteItem?.call(item.id),
+                  onTap: onEditItem == null ? null : () => onEditItem!(item.id),
                 );
               },
             ),

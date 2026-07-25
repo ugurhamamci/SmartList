@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:smartlist/core/theme/design_tokens.dart';
 import 'package:smartlist/core/theme/spacing_theme.dart';
 import 'package:smartlist/core/widgets/press_scale.dart';
+import 'package:smartlist/features/voice/presentation/widgets/voice_input_sheet.dart';
+import 'package:smartlist/models/enums.dart';
 
 /// Barkod taramasından dönen ürün bilgisi.
 ///
@@ -135,6 +137,56 @@ class _AddProductSheetState extends State<AddProductSheet> {
     );
   }
 
+  /// Mikrofonu açar ve söylenen ilk ürünü forma doldurur.
+  ///
+  /// Bu ekran **tek** ürün formu; ses birden fazla ürün duyduysa ilkini forma
+  /// yazıp kalanı bildiriyoruz. Hepsini birden eklemek isteyen kullanıcı liste
+  /// ekranındaki mikrofon düğmesini kullanıyor — o toplu ekleme için.
+  Future<void> _listen() async {
+    final heard = await VoiceInputSheet.show(context);
+    if (heard == null || heard.isEmpty || !mounted) {
+      return;
+    }
+
+    final first = heard.first;
+    setState(() {
+      _nameController.text = first.name;
+      // Bu form tam sayı miktar tutuyor; yarım kilo gibi kesirli bir miktar
+      // yukarı yuvarlanıyor ve kullanıcı gerekirse düzeltiyor.
+      _quantity = first.quantity.ceil().clamp(1, 99);
+      _unit = _unitLabelFor(first.unit);
+      if (first.price != null) {
+        _priceController.text = first.price!.toStringAsFixed(0);
+      }
+    });
+
+    if (heard.length > 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${heard.length} ürün duyuldu; ilki forma yazıldı. Hepsini birden '
+            'eklemek için liste ekranındaki mikrofonu kullanın.',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  /// Ayrıştırıcının döndürdüğü birimi bu formun etiketlerine eşler.
+  ///
+  /// Form dört etiket gösteriyor; ayrıştırıcı 16 birim tanıyor. Karşılığı
+  /// olmayan birim "Adet"e düşüyor — yanlış bir birim göstermek yerine
+  /// kullanıcının düzeltebileceği bir öntanımlı vermek daha doğru.
+  String _unitLabelFor(MeasurementUnit unit) => switch (unit) {
+    MeasurementUnit.kilogram || MeasurementUnit.gram => 'kg',
+    MeasurementUnit.liter || MeasurementUnit.milliliter => 'Litre',
+    MeasurementUnit.pack ||
+    MeasurementUnit.box ||
+    MeasurementUnit.bag => 'Paket',
+    _ => 'Adet',
+  };
+
   /// Barkod tarar ve çözülen ürünü forma doldurur.
   Future<void> _scan() async {
     final handler = widget.onScanBarcode;
@@ -228,7 +280,7 @@ class _AddProductSheetState extends State<AddProductSheet> {
                         _QuickCapture(
                           icon: Icons.mic,
                           label: 'Sesle Ekle',
-                          onTap: () => _quickCapture('Sesle ekleme'),
+                          onTap: _listen,
                         ),
                       ],
                     )
