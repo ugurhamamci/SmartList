@@ -2,47 +2,45 @@
 #
 # KULLANIM
 #   1. Bu dosyayi ayni klasore "defines.local.ps1" adiyla kopyalayin.
-#   2. Asagidaki degerleri Firebase Console'dan aldiginiz gercek degerlerle
-#      doldurun.
+#   2. Asagidaki degerleri doldurun.
 #   3. run_dev.ps1 bu dosyayi otomatik okur.
 #
 # defines.local.ps1 .gitignore'da oldugu icin asla depoya gitmez. Gercek
-# degerleri BU dosyaya yazmayin - bu dosya depoda izlenir.
-#
-# Degerleri nerede bulacaksiniz:
-#   Firebase Console > Proje ayarlari (disli ikonu) > Genel
-#   - Proje kimligi            -> FIREBASE_PROJECT_ID
-#   - Uygulamalariniz > Android -> FIREBASE_APP_ID_ANDROID, API anahtari
-#   - Uygulamalariniz > iOS     -> FIREBASE_APP_ID_IOS, API anahtari
-#   Cloud Messaging sekmesi     -> FIREBASE_MESSAGING_SENDER_ID
+# degerleri BU dosyaya yazmayin - bu dosya depoda izleniyor.
 
 @{
     # --- Zorunlu -----------------------------------------------------------
-    FLAVOR                       = 'development'
-    FIREBASE_PROJECT_ID          = 'BURAYA-PROJE-ID'
-    FIREBASE_MESSAGING_SENDER_ID = 'BURAYA-SENDER-ID'
-    FIREBASE_API_KEY_ANDROID     = 'BURAYA-ANDROID-API-KEY'
-    FIREBASE_APP_ID_ANDROID      = 'BURAYA-ANDROID-APP-ID'
+    FLAVOR = 'development'
 
-    # --- iOS'ta calistiracaksaniz ------------------------------------------
-    # FIREBASE_API_KEY_IOS       = ''
-    # FIREBASE_APP_ID_IOS        = ''
-    # FIREBASE_IOS_BUNDLE_ID     = 'com.mudo.smartlist'
+    # Supabase Dashboard > Project Settings > API
+    #
+    # SUPABASE_URL      : https://<proje-ref>.supabase.co
+    # SUPABASE_ANON_KEY : "publishable" (eski adiyla "anon") anahtar.
+    #
+    # Bu anahtarin uygulamaya gomulmesi TASARIM GEREGI guvenlidir: kimin neyi
+    # gorebilecegine RLS politikalari karar veriyor, anahtar degil.
+    #
+    # "secret" (sb_secret_...) anahtari BURAYA YAZMAYIN. O anahtar butun RLS
+    # politikalarini atlar; uygulamaya konursa APK'dan cikarilip herkesin
+    # verisi okunabilir. Yalnizca sunucu tarafinda (Edge Function) kullanilir.
+    SUPABASE_URL      = 'BURAYA-SUPABASE-URL'
+    SUPABASE_ANON_KEY = 'BURAYA-PUBLISHABLE-ANAHTAR'
 
-    # --- Opsiyonel ---------------------------------------------------------
-    # Storage kullanacaksaniz zorunlu:
-    # FIREBASE_STORAGE_BUCKET    = 'proje-id.appspot.com'
+    # --- Yapay zeka (opsiyonel) -------------------------------------------
+    # Bir saglayici anahtari yeterli; hicbiri yoksa yapay zeka ozelligi kapali
+    # kalir, uygulamanin geri kalani calisir.
+    #
+    # URETIMDE PROXY KULLANIN, ANAHTAR GOMMEYIN: AI_PROXY_BASE_URL verildiginde
+    # anahtar cihazda hic bulunmaz.
+    # AI_PROXY_BASE_URL  = 'https://<proje-ref>.supabase.co/functions/v1/ai'
 
-    # AI: URETIMDE PROXY KULLANIN, ANAHTAR GOMMEYIN.
-    # Yerel gelistirmede tek bir saglayici anahtari yeterlidir.
-    # AI_PROXY_BASE_URL          = 'https://<bolge>-<proje>.cloudfunctions.net/ai'
-    # AI_PROVIDER                = 'claude'   # claude | openai | gemini
-    # ANTHROPIC_API_KEY          = ''
-    # OPENAI_API_KEY             = ''
-    # GEMINI_API_KEY             = ''
+    # AI_PROVIDER        = 'openrouter'   # openrouter | claude | openai | gemini
+    # OPENROUTER_API_KEY = ''
+    # OPENROUTER_MODEL   = 'openai/gpt-oss-20b:free'
+    # ANTHROPIC_API_KEY  = ''
+    # OPENAI_API_KEY     = ''
+    # GEMINI_API_KEY     = ''
 
-    # Gelistirmede kapali olmasi normaldir:
-    # ENABLE_CRASHLYTICS         = 'false'
-    # ENABLE_ANALYTICS           = 'false'
-    # VERBOSE_LOGGING            = 'true'
+    # --- Gelistirme --------------------------------------------------------
+    VERBOSE_LOGGING = 'true'
 }

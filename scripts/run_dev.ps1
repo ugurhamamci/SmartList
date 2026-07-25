@@ -53,10 +53,11 @@ if ($degerler -isnot [hashtable]) {
 if ($Flavor) { $degerler['FLAVOR'] = $Flavor }
 
 # ------------------------------------------------------- dogrulama
+# Proje Supabase kullaniyor; Firebase degerleri artik gerekmiyor.
 $zorunlu = @(
     'FLAVOR',
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_MESSAGING_SENDER_ID'
+    'SUPABASE_URL',
+    'SUPABASE_ANON_KEY'
 )
 
 $eksik = $zorunlu | Where-Object {
@@ -70,20 +71,29 @@ if ($eksik) {
     Write-Host 'HATA: Su degerler doldurulmamis:' -ForegroundColor Red
     $eksik | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
     Write-Host ''
+    Write-Host 'Degerleri Supabase Dashboard > Project Settings > API altinda'
+    Write-Host 'bulabilirsiniz. "publishable" (eski adiyla anon) anahtari kullanin;'
+    Write-Host '"secret" anahtar RLS''i atlar ve uygulamaya ASLA konmaz.'
+    Write-Host ''
     Write-Host 'scripts\defines.local.ps1 dosyasini duzenleyip tekrar deneyin.'
     exit 1
 }
 
-# Platforma gore en az bir API key + app id gerekli.
-$androidTam = $degerler['FIREBASE_API_KEY_ANDROID'] -and $degerler['FIREBASE_APP_ID_ANDROID']
-$iosTam     = $degerler['FIREBASE_API_KEY_IOS']     -and $degerler['FIREBASE_APP_ID_IOS']
-$webTam     = $degerler['FIREBASE_API_KEY_WEB']     -and $degerler['FIREBASE_APP_ID_WEB']
-
-if (-not ($androidTam -or $iosTam -or $webTam)) {
+# Yanlis anahtari yapistirmak kolay bir hata ve sonucu ciddi: secret anahtar
+# tum RLS politikalarini atlar. Erkenden yakaliyoruz.
+if ($degerler['SUPABASE_ANON_KEY'] -like 'sb_secret_*') {
     Write-Host ''
-    Write-Host 'HATA: Hicbir platform icin API key + App ID cifti tanimli degil.' -ForegroundColor Red
-    Write-Host 'En az bir platformu doldurun (Android en kolayi).'
+    Write-Host 'HATA: SUPABASE_ANON_KEY bir SECRET anahtar gibi gorunuyor.' -ForegroundColor Red
+    Write-Host 'Secret anahtar butun guvenlik politikalarini atlar ve uygulamaya'
+    Write-Host 'konursa APK''dan cikarilabilir. "publishable" anahtari kullanin.'
     exit 1
+}
+
+if ($degerler['SUPABASE_URL'] -notlike 'https://*.supabase.co*') {
+    Write-Host ''
+    Write-Host 'UYARI: SUPABASE_URL beklenen bicimde degil.' -ForegroundColor Yellow
+    Write-Host '       Ornek: https://abcdefgh.supabase.co'
+    Write-Host ''
 }
 
 # --------------------------------------------------- dart-define listesi
@@ -97,7 +107,7 @@ foreach ($anahtar in ($degerler.Keys | Sort-Object)) {
 
 Write-Host ''
 Write-Host "Flavor : $($degerler['FLAVOR'])" -ForegroundColor Cyan
-Write-Host "Proje  : $($degerler['FIREBASE_PROJECT_ID'])" -ForegroundColor Cyan
+Write-Host "Sunucu : $($degerler['SUPABASE_URL'])" -ForegroundColor Cyan
 Write-Host "Define : $($defineArgs.Count) adet" -ForegroundColor Cyan
 
 # Gizli degerleri ekrana basmiyoruz; yalnizca hangi anahtarlarin
