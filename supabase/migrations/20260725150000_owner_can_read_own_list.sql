@@ -17,6 +17,11 @@
 --
 -- Politikalar izin verici (permissive) oldugu icin OR'lanir; mevcut
 -- `shopping_lists_select_member` politikasi oldugu gibi kaliyor.
+-- Postgres'te `create policy if not exists` yok, bu yuzden onunde bir
+-- `drop` var: dosya yeniden calistirilabilir kalsin. Politikayi dusurup
+-- yeniden kurmak guvenli, cunku ayni islem icinde geri geliyor.
+drop policy if exists shopping_lists_select_owner on public.shopping_lists;
+
 create policy shopping_lists_select_owner
   on public.shopping_lists for select
   to authenticated

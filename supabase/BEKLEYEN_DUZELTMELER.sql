@@ -1,10 +1,13 @@
 -- SmartList — BEKLEYEN DUZELTMELER
 --
--- Bu dosya supabase/migrations altindaki iki dosyanin birlesimi. Canli
--- olcumle dogrulandi: ikisi de HENUZ UYGULANMAMIS.
+-- Bu dosya supabase/migrations altindaki iki dosyanin birlesimi.
 --
---   shopping_lists_select_owner : HTTP 403  (liste olusturma donusu okunamiyor)
---   touch_audit duzeltmesi      : surum 2 -> 3  (sayac trigger'i surumu artiriyor)
+-- DURUM: ikisi de canli projeye UYGULANDI ve olcumle dogrulandi:
+--   shopping_lists_select_owner : HTTP 201  (onceden 403)
+--   touch_audit duzeltmesi      : surum 1 -> 1  (onceden 2 -> 3)
+--
+-- Dosya, semayi sifirdan kuran yeni bir ortam icin duruyor. schema_all.sql
+-- bunlari zaten iceriyor; ayri ayri uygulamak gerekmiyor.
 --
 -- NASIL UYGULANIR
 --   Supabase Dashboard > SQL Editor > New query > bu dosyanin tamamini
@@ -35,6 +38,11 @@
 --
 -- Politikalar izin verici (permissive) oldugu icin OR'lanir; mevcut
 -- `shopping_lists_select_member` politikasi oldugu gibi kaliyor.
+-- Postgres'te `create policy if not exists` yok, bu yuzden onunde bir
+-- `drop` var: dosya yeniden calistirilabilir kalsin. Politikayi dusurup
+-- yeniden kurmak guvenli, cunku ayni islem icinde geri geliyor.
+drop policy if exists shopping_lists_select_owner on public.shopping_lists;
+
 create policy shopping_lists_select_owner
   on public.shopping_lists for select
   to authenticated
