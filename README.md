@@ -246,6 +246,7 @@ boşluk değeri gömmez.
 |---|---|
 | **[DURUM_RAPORU.md](DURUM_RAPORU.md)** | Güncel durum raporu: ne çalışıyor, hangi seviyede, sırada ne var |
 | **[docs/KURULUM.md](docs/KURULUM.md)** | Sıfırdan kurulum, adım adım, sorun giderme |
+| **[docs/SUPABASE_AYARLARI.md](docs/SUPABASE_AYARLARI.md)** | Kodla yapılamayan Dashboard ayarları ve doğrulama betiği |
 | **[docs/OZET.md](docs/OZET.md)** | Ne yapıldı / ne yapılmadı (Türkçe) |
 | [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md) | Detaylı envanter (İngilizce) |
 | [docs/FIRESTORE_SCHEMA.md](docs/FIRESTORE_SCHEMA.md) | Veritabanı şeması ve tasarım kararları |
