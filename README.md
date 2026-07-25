@@ -7,7 +7,10 @@ ortak alışveriş listesi** uygulaması. Tek Flutter kod tabanından Android ve
 ![Dart](https://img.shields.io/badge/Dart-3.12.2-0175C2?logo=dart)
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20FCM-FFCA28?logo=firebase)
 ![Analiz](https://img.shields.io/badge/flutter%20analyze-0%20uyar%C4%B1-brightgreen)
-![Test](https://img.shields.io/badge/test-25%20ge%C3%A7ti-brightgreen)
+![Test](https://img.shields.io/badge/test-54%20ge%C3%A7ti-brightgreen)
+
+> 📋 **Projenin güncel durumu, neyin çalıştığı ve neyin eksik olduğu:**
+> **[DURUM_RAPORU.md](DURUM_RAPORU.md)**
 
 ---
 
@@ -241,6 +244,7 @@ boşluk değeri gömmez.
 
 | Dosya | İçerik |
 |---|---|
+| **[DURUM_RAPORU.md](DURUM_RAPORU.md)** | Güncel durum raporu: ne çalışıyor, hangi seviyede, sırada ne var |
 | **[docs/KURULUM.md](docs/KURULUM.md)** | Sıfırdan kurulum, adım adım, sorun giderme |
 | **[docs/OZET.md](docs/OZET.md)** | Ne yapıldı / ne yapılmadı (Türkçe) |
 | [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md) | Detaylı envanter (İngilizce) |
