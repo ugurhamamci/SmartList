@@ -242,7 +242,7 @@ void main() {
             recentQueries: const ['süt'],
             onSearch: (query) {
               queries.add(query);
-              return [
+              return const [
                 SearchHit(
                   listId: '1',
                   title: 'Haftalık Market',

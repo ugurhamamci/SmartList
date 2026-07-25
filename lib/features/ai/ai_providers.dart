@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:smartlist/features/ai/data/claude_ai_provider.dart';
 import 'package:smartlist/features/ai/data/gemini_ai_provider.dart';
+import 'package:smartlist/features/ai/data/open_router_ai_provider.dart';
 import 'package:smartlist/features/ai/data/openai_ai_provider.dart';
 import 'package:smartlist/features/ai/domain/ai_provider.dart';
 import 'package:smartlist/features/ai/domain/ai_service.dart';
@@ -53,10 +54,23 @@ final geminiProviderRef = Provider<AiProvider>((ref) {
   );
 });
 
+final openRouterProviderRef = Provider<AiProvider>((ref) {
+  final config = ref.watch(appConfigProvider);
+  return OpenRouterAiProvider(
+    dio: ref.watch(aiDioProvider),
+    apiKey: config.openRouterApiKey,
+    proxyBaseUrl: config.aiProxyBaseUrl,
+    model: config.openRouterModel,
+  );
+});
+
 /// Registration order is the fallback order used when the vendor selected in
 /// settings has no credentials in this build.
 final aiProviderRegistryProvider = Provider<AiProviderRegistry>((ref) {
   return AiProviderRegistry([
+    // OpenRouter basta: tek anahtarla calisiyor ve ucretsiz katmani var, yani
+    // digerleri icin anahtar girilmemis bir kurulumda ozellik yine acik olur.
+    ref.watch(openRouterProviderRef),
     ref.watch(claudeProviderRef),
     ref.watch(openAiProviderRef),
     ref.watch(geminiProviderRef),

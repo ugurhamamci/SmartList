@@ -613,7 +613,11 @@ enum AiListKind {
 enum AiProviderKind {
   openAi('openai'),
   gemini('gemini'),
-  claude('claude');
+  claude('claude'),
+
+  /// OpenRouter tek anahtarla onlarca modele erisim veren bir gecit. API'si
+  /// OpenAI ile uyumlu, o yuzden ayri bir istek bicimi gerekmiyor.
+  openRouter('openrouter');
 
   const AiProviderKind(this.wire);
 
@@ -632,6 +636,7 @@ enum AiProviderKind {
     AiProviderKind.openAi => 'OpenAI',
     AiProviderKind.gemini => 'Gemini',
     AiProviderKind.claude => 'Claude',
+    AiProviderKind.openRouter => 'OpenRouter',
   };
 }
 

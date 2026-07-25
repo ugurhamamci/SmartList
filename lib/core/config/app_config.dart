@@ -20,6 +20,8 @@ final class AppConfig {
     required this.openAiApiKey,
     required this.geminiApiKey,
     required this.anthropicApiKey,
+    required this.openRouterApiKey,
+    required this.openRouterModel,
   });
 
   /// Builds the configuration from the ambient `--dart-define` values.
@@ -57,6 +59,13 @@ final class AppConfig {
       openAiApiKey: const String.fromEnvironment('OPENAI_API_KEY'),
       geminiApiKey: const String.fromEnvironment('GEMINI_API_KEY'),
       anthropicApiKey: const String.fromEnvironment('ANTHROPIC_API_KEY'),
+      openRouterApiKey: const String.fromEnvironment('OPENROUTER_API_KEY'),
+      // Model kimligi de --dart-define ile geliyor: OpenRouter'da ucretsiz
+      // katmandaki modeller degisebiliyor, yeniden derlemeden gecmek gerekiyor.
+      openRouterModel: const String.fromEnvironment(
+        'OPENROUTER_MODEL',
+        defaultValue: 'openai/gpt-oss-20b:free',
+      ),
     );
   }
 
@@ -80,6 +89,10 @@ final class AppConfig {
   final String openAiApiKey;
   final String geminiApiKey;
   final String anthropicApiKey;
+  final String openRouterApiKey;
+
+  /// OpenRouter model kimligi (orn. `openai/gpt-oss-20b:free`).
+  final String openRouterModel;
 
   /// True when requests should be routed through the server-side proxy.
   bool get useAiProxy => aiProxyBaseUrl.isNotEmpty;
@@ -88,7 +101,8 @@ final class AppConfig {
   bool get hasDirectAiKey =>
       openAiApiKey.isNotEmpty ||
       geminiApiKey.isNotEmpty ||
-      anthropicApiKey.isNotEmpty;
+      anthropicApiKey.isNotEmpty ||
+      openRouterApiKey.isNotEmpty;
 
   /// Network timeouts applied to the AI proxy and any direct provider call.
   Duration get connectTimeout => const Duration(seconds: 15);
