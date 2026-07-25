@@ -103,3 +103,8 @@ scripts/*.local.sh
 supabase/.branches/
 supabase/.temp/
 .supabase/
+
+# The database connection string holds the Postgres password, and the anon key
+# belongs to one specific project. Only the template is tracked — the broad
+# `.env.*` rule above would otherwise swallow it too.
+!supabase/.env.local.example
