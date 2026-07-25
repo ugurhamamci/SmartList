@@ -330,6 +330,61 @@ class ListsRepository {
     });
   }
 
+  /// Birden çok ürünü tek istekte ekler.
+  ///
+  /// Yapay zekâ üretimi ve sesle ekleme 10–20 ürünü birlikte getiriyor; her
+  /// biri için ayrı istek atmak mobil bağlantıda gözle görülür bir gecikme
+  /// demek. Tek `insert` aynı zamanda tek işlem: yarısı yazılıp yarısı
+  /// yazılmadan kalmıyor.
+  ///
+  /// Sıra değerleri tek bir taban üzerinden artırılıyor, böylece ürünler
+  /// söylendikleri/üretildikleri sırayla listede duruyor.
+  Future<void> addItems({
+    required String listId,
+    required List<
+      ({
+        String name,
+        double quantity,
+        String unit,
+        double? price,
+        String notes,
+      })
+    >
+    items,
+    String source = 'manual',
+  }) {
+    return ErrorMapper.guard(() async {
+      if (items.isEmpty) {
+        return;
+      }
+
+      final base =
+          ItemRow.toDouble(
+            await _client.rpc<dynamic>(
+              'next_item_sort_order',
+              params: {'p_list_id': listId},
+            ),
+          ) ??
+          0;
+
+      await _client.from('items').insert([
+        for (var i = 0; i < items.length; i++)
+          {
+            'list_id': listId,
+            'name': items[i].name.trim(),
+            'quantity': items[i].quantity,
+            'unit': items[i].unit,
+            'price': ?items[i].price,
+            if (items[i].notes.trim().isNotEmpty)
+              'notes': items[i].notes.trim(),
+            'source': source,
+            // Aralık 1000: aralarına sonradan sürükleyerek ürün eklenebilsin.
+            'sort_order': base + i * 1000,
+          },
+      ]);
+    });
+  }
+
   /// Ürünü alındı / alınmadı olarak işaretler.
   ///
   /// Viewer rolündeki bir üye de bunu yapabiliyor; hangi sütunlara

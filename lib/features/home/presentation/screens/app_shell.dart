@@ -9,6 +9,7 @@ import 'package:smartlist/core/errors/app_exception_messages.dart';
 import 'package:smartlist/core/theme/design_tokens.dart';
 import 'package:smartlist/core/theme/spacing_theme.dart';
 import 'package:smartlist/core/widgets/avatar_stack.dart';
+import 'package:smartlist/features/ai/presentation/widgets/ai_generate_sheet.dart';
 import 'package:smartlist/features/auth/auth_providers.dart';
 import 'package:smartlist/features/barcode/data/product_lookup_service.dart';
 import 'package:smartlist/features/barcode/presentation/screens/scanner_screen.dart';
@@ -26,6 +27,7 @@ import 'package:smartlist/features/shopping_lists/presentation/widgets/create_li
 import 'package:smartlist/features/shopping_lists/presentation/widgets/shopping_item_tile.dart';
 import 'package:smartlist/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:smartlist/features/subscription/presentation/widgets/premium_sheet.dart';
+import 'package:smartlist/features/voice/presentation/widgets/voice_input_sheet.dart';
 
 /// Barkod sorgusu için HTTP istemcisi.
 final _lookupDioProvider = Provider<Dio>((ref) {
@@ -124,6 +126,48 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     _snack('Listeye katıldınız');
+    await _openList(listId);
+  }
+
+  /// Yapay zekâ ile liste üretir: onaylanan ürünler yeni bir listeye yazılır.
+  ///
+  /// Ürünler tek tek eklenmek yerine toplu yazılıyor; 15 ürün için 15 ayrı
+  /// istek atmak mobil bağlantıda gözle görülür bir gecikme demek.
+  Future<void> _generateWithAi() async {
+    final picked = await AiGenerateSheet.show(context);
+    if (picked == null) {
+      return;
+    }
+
+    final listId = await _run(
+      () => _repository.createList(
+        title: picked.title,
+        emoji: '🛒',
+        colorHex: 'FF3525CD',
+      ),
+    );
+    if (listId == null) {
+      return;
+    }
+
+    await _run(
+      () => _repository.addItems(
+        listId: listId,
+        items: [
+          for (final item in picked.items)
+            (
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit.wire,
+              price: item.estimatedPrice,
+              notes: item.notes,
+            ),
+        ],
+        source: 'ai',
+      ),
+    );
+
+    _snack('${picked.items.length} ürün eklendi');
     await _openList(listId);
   }
 
@@ -298,8 +342,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           onProfileTap: () => setState(() => _tab = AppTab.profile),
           onNewList: _createList,
           onJoinWithQr: _joinByQr,
-          onGenerateWithAi: () =>
-              _snack('Yapay zekâ liste üretimi servis katmanında hazır'),
+          onGenerateWithAi: _generateWithAi,
           onInvite: rows.isEmpty
               ? null
               : () => _shareList(rows.first.id, copyOnly: false),
@@ -554,6 +597,29 @@ class _ListDetailPage extends ConsumerWidget {
       );
     }
 
+    Future<void> addByVoice() async {
+      final spoken = await VoiceInputSheet.show(context);
+      if (spoken == null || spoken.isEmpty) {
+        return;
+      }
+      await run(
+        () => repository.addItems(
+          listId: listId,
+          items: [
+            for (final item in spoken)
+              (
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit.wire,
+                price: null,
+                notes: '',
+              ),
+          ],
+          source: 'voice',
+        ),
+      );
+    }
+
     return Scaffold(
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -595,9 +661,25 @@ class _ListDetailPage extends ConsumerWidget {
           onClearCompleted: () => run(() => repository.clearCompleted(listId)),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addProduct,
-        child: const Icon(Icons.add, size: DesignTokens.iconLarge),
+      // İki eylem: konuşarak hızlı ekleme ve elle ayrıntılı ekleme. Mikrofon
+      // küçük tutuldu, birincil eylem hâlâ elle ekleme.
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'voice',
+            onPressed: addByVoice,
+            tooltip: 'Sesle ekle',
+            child: const Icon(Icons.mic),
+          ),
+          const SizedBox(height: DesignTokens.space3),
+          FloatingActionButton(
+            heroTag: 'add',
+            onPressed: addProduct,
+            child: const Icon(Icons.add, size: DesignTokens.iconLarge),
+          ),
+        ],
       ),
     );
   }
