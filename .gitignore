@@ -90,3 +90,16 @@ scripts/*.local.sh
 # NOTE: *.g.dart, *.freezed.dart and lib/l10n/generated/ are deliberately NOT
 # ignored. CI regenerates them and fails if the committed output differs, which
 # only works if they are tracked.
+
+# Agent skills are vendored under .agents/skills/ and tracked there, together
+# with skills-lock.json. The per-tool directories are junctions (Windows) or
+# symlinks pointing at the same files; committing them would duplicate every
+# file in the repository, so they are recreated locally instead:
+#   npx skills add supabase/agent-skills
+.claude/skills/
+
+# Supabase CLI working files. The linked project ref and any access token are
+# machine-specific; migrations under supabase/migrations/ ARE tracked.
+supabase/.branches/
+supabase/.temp/
+.supabase/
