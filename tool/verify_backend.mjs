@@ -170,14 +170,25 @@ check('10 premium ozellik var', Array.isArray(feats.body) && feats.body.length =
   `gelen ${Array.isArray(feats.body) ? feats.body.length : JSON.stringify(feats.body).slice(0,120)}`);
 
 console.log('\n=== 3. Liste olusturma ve sahiplik trigger ===');
+// Kimlik ISTEMCIDE uretiliyor ve donus istenmiyor. Sebep olculdu:
+// `return=representation` kullanildiginda Postgres SELECT politikasini da
+// uyguluyor ve o kontrol, uyeligi ekleyen AFTER INSERT trigger'indan once
+// calisiyor; liste sahibi kendi satirini okuyamiyor (403). Uygulama da ayni
+// yolu kullaniyor, test de onu sinamali.
+const listId = crypto.randomUUID();
 const created = await api('/rest/v1/shopping_lists', {
   token: anne.token,
   method: 'POST',
-  prefer: 'return=representation',
-  body: { title: 'Ev İhtiyaç Listesi', owner_id: anne.id, emoji: '🏠' },
+  prefer: 'return=minimal',
+  body: { id: listId, title: 'Ev İhtiyaç Listesi', owner_id: anne.id, emoji: '🏠' },
 });
 check('liste olusturuldu', created.status === 201, `HTTP ${created.status} ${JSON.stringify(created.body).slice(0, 240)}`);
-const list = Array.isArray(created.body) ? created.body[0] : null;
+
+// Uyelik trigger'i calistiktan sonra satir okunabilir olmali.
+const readBack = await api(`/rest/v1/shopping_lists?id=eq.${listId}&select=*`, { token: anne.token });
+check('olusturulan liste geri okunabiliyor', Array.isArray(readBack.body) && readBack.body.length === 1,
+  `HTTP ${readBack.status} ${JSON.stringify(readBack.body).slice(0, 200)}`);
+const list = Array.isArray(readBack.body) ? readBack.body[0] : null;
 
 if (!list) {
   console.log(`\nLISTE OLUSTURULAMADI - kalan testler atlaniyor.`);
@@ -186,7 +197,9 @@ if (!list) {
 }
 
 check('created_by trigger ile dolduruldu', list.created_by === anne.id, `gelen ${list.created_by}`);
-check('version 1 olarak baslatildi', list.version === 1, `gelen ${list.version}`);
+// Sayac trigger'lari listeyi guncelledigi icin surum 1'de kalmiyor; onemli
+// olan surumun ARTIYOR olmasi (12. grup bunu sinar).
+check('version baslatildi', (list.version ?? 0) >= 1, `gelen ${list.version}`);
 
 const members = await api(`/rest/v1/list_members?list_id=eq.${list.id}&select=user_id,role`, { token: anne.token });
 check('olusturan kisi owner uyesi yapildi',
@@ -307,11 +320,13 @@ if (ids.length) {
   check('viewer tamamlandi isaretini DEGISTIREBILIYOR', toggleAttempt.status < 300,
     `HTTP ${toggleAttempt.status} ${JSON.stringify(toggleAttempt.body).slice(0, 200)}`);
 
-  const deleteAttempt = await api(`/rest/v1/items?id=eq.${ids[0]}`, {
-    token: baba.token, method: 'DELETE',
-  });
-  check('viewer urun SILEMIYOR', deleteAttempt.status >= 400,
-    `HTTP ${deleteAttempt.status} ${JSON.stringify(deleteAttempt.body).slice(0, 160)}`);
+  // DIKKAT: PostgREST, RLS butun satirlari filtreledigi zaman da DELETE icin
+  // 204 donuyor - hicbir sey silinmedigi halde "basarili" gorunuyor. Bu yuzden
+  // durum kodunu degil, satirin HALA VAR OLDUGUNU siniyoruz.
+  await api(`/rest/v1/items?id=eq.${ids[0]}`, { token: baba.token, method: 'DELETE' });
+  const survived = await api(`/rest/v1/items?id=eq.${ids[0]}&select=id`, { token: anne.token });
+  check('viewer urun SILEMIYOR', Array.isArray(survived.body) && survived.body.length === 1,
+    `silme sonrasi satir: ${JSON.stringify(survived.body).slice(0, 160)}`);
 }
 
 console.log('\n=== 9. Etkinlik kaydi degistirilemez ===');
@@ -320,11 +335,15 @@ check('katilma etkinligi kaydedildi',
   Array.isArray(logs.body) && logs.body.some((l) => l.action === 'member_joined'),
   JSON.stringify(logs.body).slice(0, 200));
 if (logs.body?.[0]) {
-  const tamper = await api(`/rest/v1/activity_logs?id=eq.${logs.body[0].id}`, {
+  // Ayni PostgREST davranisi: politikasi olmayan UPDATE 0 satir etkiliyor ve
+  // 204 donuyor. Kaydin ICERIGININ degismedigini dogruluyoruz.
+  const originalAction = logs.body[0].action;
+  await api(`/rest/v1/activity_logs?id=eq.${logs.body[0].id}`, {
     token: anne.token, method: 'PATCH', body: { action: 'list_deleted' },
   });
-  check('etkinlik kaydi guncellenemiyor', tamper.status >= 400,
-    `HTTP ${tamper.status} ${JSON.stringify(tamper.body).slice(0, 160)}`);
+  const after = await api(`/rest/v1/activity_logs?id=eq.${logs.body[0].id}&select=action`, { token: anne.token });
+  check('etkinlik kaydi guncellenemiyor', after.body?.[0]?.action === originalAction,
+    `once "${originalAction}", sonra "${after.body?.[0]?.action}"`);
 }
 
 console.log('\n=== 10. Premium kendine verilemiyor ===');

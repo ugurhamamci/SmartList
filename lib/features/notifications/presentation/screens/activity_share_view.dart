@@ -41,6 +41,7 @@ class ActivityShareView extends StatefulWidget {
     required this.members,
     this.listName = 'Haftalık Market',
     this.inviteLink = 'smartlist.app/j/82Xq...',
+    this.startOnShareTab = false,
     this.onMarkAllRead,
     this.onCopyLink,
     this.onShareWhatsApp,
@@ -53,6 +54,12 @@ class ActivityShareView extends StatefulWidget {
   final String listName;
   final String inviteLink;
 
+  /// Ekran doğrudan Share sekmesiyle açılsın mı.
+  ///
+  /// Paylaşma niyetiyle açıldığında Activity sekmesini göstermek kullanıcıyı
+  /// fazladan bir dokunuşa zorluyordu.
+  final bool startOnShareTab;
+
   final VoidCallback? onMarkAllRead;
   final VoidCallback? onCopyLink;
   final VoidCallback? onShareWhatsApp;
@@ -63,7 +70,7 @@ class ActivityShareView extends StatefulWidget {
 }
 
 class _ActivityShareViewState extends State<ActivityShareView> {
-  bool _showActivity = true;
+  late bool _showActivity = !widget.startOnShareTab;
 
   @override
   Widget build(BuildContext context) {

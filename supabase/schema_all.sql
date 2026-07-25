@@ -1,6 +1,6 @@
 -- SmartList — TAM SEMA (tek dosya)
 --
--- Bu dosya supabase/migrations/ altindaki 8 dosyanin sirali
+-- Bu dosya supabase/migrations/ altindaki 10 dosyanin sirali
 -- birlesimidir. Uretilen bir dosyadir; ELLE DUZENLEMEYIN. Kaynak dosyalari
 -- degistirip yeniden uretin:
 --
@@ -2501,3 +2501,87 @@ alter type public.ai_provider_kind add value if not exists 'openrouter';
 revoke all on function public.next_item_sort_order(uuid) from public, anon;
 
 grant execute on function public.next_item_sort_order(uuid) to authenticated;
+
+-- ======================================================================
+-- DOSYA: 20260725150000_owner_can_read_own_list.sql
+-- ======================================================================
+
+-- Liste sahibi kendi listesini her zaman okuyabilir.
+--
+-- Canli dogrulama (tool/verify_backend.mjs) su hatayi buldu: liste olusturmak
+-- `Prefer: return=representation` ile 403 veriyordu, `return=minimal` ile 201.
+-- Yani INSERT politikasi dogruydu, reddedilen sey donen satirin OKUNMASIYDI.
+--
+-- Sebep: `insert ... returning` kullanildiginda Postgres SELECT politikasini da
+-- uyguluyor ve bu kontrol, uyelik satirini ekleyen `add_owner_as_member`
+-- AFTER INSERT trigger'indan ONCE degerlendiriliyor. O anda `is_list_member()`
+-- henuz false donuyor, cunku uyelik daha yazilmamis.
+--
+-- Cozum, trigger'in sirasiyla oynamak degil (liste satiri var olmadan uyelik
+-- eklenemez, foreign key buna izin vermez) ayri bir politika eklemek:
+-- "sahip kendi listesini gorur". Bu zaten dogru bir degismez (invariant) ve
+-- uyelik tablosundan bagimsiz: uyelik satiri herhangi bir sebeple eksik kalsa
+-- bile sahibin listesini kaybetmemesi gerekiyor.
+--
+-- Politikalar izin verici (permissive) oldugu icin OR'lanir; mevcut
+-- `shopping_lists_select_member` politikasi oldugu gibi kaliyor.
+create policy shopping_lists_select_owner
+  on public.shopping_lists for select
+  to authenticated
+  using (owner_id = (select auth.uid()));
+
+-- ======================================================================
+-- DOSYA: 20260725160000_version_tracks_user_edits.sql
+-- ======================================================================
+
+-- `version` yalnizca kullanici duzenlemelerini saysin.
+--
+-- Canli dogrulama sunu gosterdi: yeni olusturulan bir listenin surumu 1 degil
+-- 2 oluyordu. Sebep sayac trigger'lari - urun eklendiginde
+-- `refresh_list_item_counters` listeyi guncelliyor, bu da `touch_audit`
+-- trigger'ini tetikliyor ve surumu artiriyor.
+--
+-- Bu davranis iyimser eszamanlilik icin gurultu uretiyor: surum, kullanicinin
+-- yaptigi bir degisikligi degil sunucunun defter tutmasini yansitiyor. Sonucu
+-- somut: iki kisi ayni listede calisirken biri urun eklerken digeri liste
+-- adini degistirmeye kalksa, ad degisikligi "kayit baska cihazdan degisti"
+-- diye reddedilirdi - halbuki catisan bir sey yok.
+--
+-- `pg_trigger_depth()` cagiranin derinligini soyluyor: istemciden gelen bir
+-- UPDATE'te 1, baska bir trigger icinden gelen UPDATE'te 1'den buyuk. Surumu
+-- yalnizca birincide artiriyoruz.
+--
+-- `updated_at` her iki durumda da taze kaliyor: "bu liste en son ne zaman
+-- degisti" sorusunun cevabi sayac guncellemesini de kapsamali, cunku kullanici
+-- icin liste gercekten degismis oluyor.
+create or replace function public.touch_audit()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  -- Olusturma bilgisi degistirilemez: kim ne zaman olusturdu sorusunun cevabi
+  -- sonradan yeniden yazilabilir olmamali.
+  new.created_at := old.created_at;
+  new.created_by := old.created_by;
+
+  new.updated_at := now();
+
+  if pg_trigger_depth() <= 1 then
+    -- Istemciden gelen gercek bir duzenleme.
+    new.updated_by := coalesce(auth.uid(), old.updated_by);
+    new.version := old.version + 1;
+  else
+    -- Baska bir trigger'in yazdigi defter guncellemesi (sayaclar gibi):
+    -- surumu ve "kim guncelledi" bilgisini bozmuyoruz.
+    new.updated_by := old.updated_by;
+    new.version := old.version;
+  end if;
+
+  return new;
+end;
+$$;
+
+comment on function public.touch_audit() is
+  'Denetim alanlarini yazar. Surum yalnizca istemciden gelen duzenlemelerde artar; trigger kaynakli sayac guncellemeleri surumu bozmaz.';
