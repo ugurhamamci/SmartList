@@ -1,31 +1,11 @@
 -- SmartList — TAM SEMA (tek dosya)
 --
--- Bu dosya supabase/migrations/ altindaki 7 dosyanin sirali
+-- Bu dosya supabase/migrations/ altindaki 8 dosyanin sirali
 -- birlesimidir. Uretilen bir dosyadir; ELLE DUZENLEMEYIN. Kaynak dosyalari
 -- degistirip yeniden uretin:
 --
 --   node -e "..."  ya da  .scriptssupabase_push.ps1
 --
--- ============================ NASIL UYGULANIR ============================
---
--- YOL 1 — Dashboard (veritabani sifresi GEREKMEZ):
---   1. Supabase Dashboard > sol menu > SQL Editor > New query
---   2. Bu dosyanin TAMAMINI kopyalayip yapistirin
---   3. Run (Ctrl+Enter)
---
--- YOL 2 — CLI (Session pooler baglanti dizgesi gerekir):
---   .scriptssupabase_push.ps1
---
--- Iki yol da yeniden calistirilabilir: trigger'lar, yayin ve baslangic
--- verisi "varsa atla" bicimde yazildi. Tablolar icin ise ilk calistirmadan
--- sonra "already exists" hatasi normaldir.
---
--- Uygulandiktan sonra dogrulama:
---   .scriptssupabase_push.ps1 -Verify
---
--- =========================================================================
-
-
 -- ======================================================================
 -- DOSYA: 20260725090000_types.sql
 -- ======================================================================
@@ -2502,3 +2482,22 @@ on conflict (id) do nothing;
 -- vardi; 12'den beri calisiyor ve Supabase 17 uzerinde. Yine de deger zaten
 -- varsa hata vermemesi icin `if not exists` kullaniliyor.
 alter type public.ai_provider_kind add value if not exists 'openrouter';
+
+-- ======================================================================
+-- DOSYA: 20260725140000_lock_sort_order_rpc.sql
+-- ======================================================================
+
+-- `next_item_sort_order` fonksiyonunu anonim erişime kapatır.
+--
+-- Sema uygulandiktan sonra REST ucundan dogrulama yapildi ve bu fonksiyon
+-- anon anahtariyla cagrilabildi (HTTP 200). Digerlerinde `revoke ... from
+-- public, anon` vardi, bunda atlanmis.
+--
+-- Sizinti kucuk ama gercek: fonksiyon `security definer`, yani RLS'i atliyor.
+-- Anonim bir cagirici liste kimligi deneyerek o listede urun olup olmadigini
+-- ogrenebiliyordu (bos listede 1000, dolu listede daha buyuk deger doner).
+-- Uygulamanin tamami giris gerektirdigi icin anon'un bu fonksiyona erisimi
+-- hicbir ise yaramiyor.
+revoke all on function public.next_item_sort_order(uuid) from public, anon;
+
+grant execute on function public.next_item_sort_order(uuid) to authenticated;
